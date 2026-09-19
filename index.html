@@ -69,13 +69,18 @@
   </div>
 
   <div class="form-group">
-    <label>間口（m）</label>
+    <label>間口（敷地・m）</label>
     <input type="number" id="width" step="0.1" placeholder="例: 12.5">
   </div>
 
   <div class="form-group">
-    <label>奥行（m）</label>
+    <label>奥行（敷地・m）</label>
     <input type="number" id="depth" step="0.1" placeholder="例: 18.0">
+  </div>
+
+  <div class="form-group">
+    <label>建物の間口（任意・m）</label>
+    <input type="number" id="bldgWidth" step="0.1" placeholder="指定しない場合は自動">
   </div>
 
   <div class="form-group">
@@ -116,6 +121,7 @@
     <div class="result-item">最大延床面積： <strong id="totalFloorArea"></strong> ㎡</div>
     <div class="result-item">適用斜線勾配： <strong id="slopeRatio"></strong></div>
     <div class="result-item">道路に面する部分の高さ： <strong id="heightLimit"></strong> m</div>
+    <div class="result-item">絶対高さ制限： <strong id="absHeight"></strong></div>
     <div class="result-item">おおよその階数： <strong id="floors"></strong> 階</div>
 
     <div class="floor-list" id="floorAreas"></div>
@@ -124,9 +130,9 @@
 
     <p class="note">
       ※これは簡易版です。<br>
-      ・各階面積は斜線制限下の有効奥行きから概算しています<br>
-      ・1階は最大建築面積を基本とし、上層階は斜線で削られた面積になります<br>
-      ・合計が最大延床面積を超えないように調整しています<br>
+      ・各階で敷地境界から最低0.5mの離れを確保しています<br>
+      ・建物の間口未指定時は「敷地間口 − 1.0m」になります<br>
+      ・シミュレーション建ぺい率・容積率は実際に積み上げた面積から計算しています<br>
       実際の法規確認は必ず別途行ってください。
     </p>
   </div>
@@ -134,18 +140,18 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script>
     const zoningData = {
-      "1low": { coverage: 50, far: 100, slope: 1.25 },
-      "2low": { coverage: 60, far: 150, slope: 1.25 },
-      "1mid": { coverage: 60, far: 200, slope: 1.25 },
-      "2mid": { coverage: 60, far: 200, slope: 1.25 },
-      "1res": { coverage: 60, far: 200, slope: 1.25 },
-      "2res": { coverage: 60, far: 200, slope: 1.25 },
-      "quasi": { coverage: 60, far: 200, slope: 1.25 },
-      "neighbor": { coverage: 80, far: 200, slope: 1.5 },
-      "commercial": { coverage: 80, far: 400, slope: 1.5 },
-      "quasi-ind": { coverage: 60, far: 200, slope: 1.5 },
-      "industrial": { coverage: 60, far: 200, slope: 1.5 },
-      "exclusive-ind": { coverage: 60, far: 200, slope: 1.5 }
+      "1low": { coverage: 50, far: 100, slope: 1.25, absHeight: 10 },
+      "2low": { coverage: 60, far: 150, slope: 1.25, absHeight: 10 },
+      "1mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
+      "2mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
+      "1res": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
+      "2res": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
+      "quasi": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
+      "neighbor": { coverage: 80, far: 200, slope: 1.5, absHeight: null },
+      "commercial": { coverage: 80, far: 400, slope: 1.5, absHeight: null },
+      "quasi-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null },
+      "industrial": { coverage: 60, far: 200, slope: 1.5, absHeight: null },
+      "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null }
     };
 
     function applyZoning() {
@@ -285,6 +291,7 @@
     function calculate() {
       const siteW = parseFloat(document.getElementById('width').value);
       const siteD = parseFloat(document.getElementById('depth').value);
+      const bldgWInput = parseFloat(document.getElementById('bldgWidth').value);
       const coverage = parseFloat(document.getElementById('coverage').value);
       const far = parseFloat(document.getElementById('far').value);
       const road = parseFloat(document.getElementById('road').value);
@@ -299,74 +306,91 @@
       }
 
       let slope = 1.25;
+      let absHeight = null;
       if (zoningKey && zoningData[zoningKey]) {
         slope = zoningData[zoningKey].slope;
+        absHeight = zoningData[zoningKey].absHeight;
       }
 
       const siteArea = siteW * siteD;
       const maxBuildingArea = siteArea * (coverage / 100);
       const maxTotalFloor = siteArea * (far / 100);
-      const frontHeightLimit = (road + setback) * slope;
+      let frontHeightLimit = (road + setback) * slope;
 
-      // ===== 各階面積計算（修正版） =====
+      if (absHeight !== null) {
+        frontHeightLimit = Math.min(frontHeightLimit, absHeight);
+      }
+
+      // 建物間口
+      let buildingW;
+      if (bldgWInput && bldgWInput > 0) {
+        buildingW = Math.min(bldgWInput, siteW - 1.0);
+      } else {
+        buildingW = siteW - 1.0; // 未指定時は敷地間口−1m
+      }
+      if (buildingW < 1) buildingW = 1;
+
+      const maxPossibleDepth = Math.max(siteD - setback - 0.5, 1);
+
+      // ===== 各階面積計算 =====
       const floorAreas = [];
       let remaining = maxTotalFloor;
       let floor = 1;
-      const maxFloors = 12;
+      const maxFloors = 15;
 
       while (remaining > 5 && floor <= maxFloors) {
         const flHeight = fl1 + (floor - 1) * floorH;
 
-        // 斜線起点（道路反対側）から、この高さに達する水平距離
-        const distFromOpposite = flHeight / slope;
+        if (absHeight !== null && flHeight > absHeight) break;
 
-        // カット面の位置（道路境界からの距離）
-        // 道路反対側から distFromOpposite 進んだ位置
+        const distFromOpposite = flHeight / slope;
         const cutPositionFromRoadBoundary = distFromOpposite - road;
 
-        // 建物が建てられる奥行き
-        // カット面より奥側が有効
         let availableDepth;
         if (cutPositionFromRoadBoundary <= setback) {
-          // まだ斜線がセットバック位置に届いていない → フルで使える
-          availableDepth = siteD - setback;
+          availableDepth = maxPossibleDepth;
         } else {
-          // 斜線がセットバックより奥に来ている → 残り奥行き
-          availableDepth = siteD - cutPositionFromRoadBoundary;
+          availableDepth = Math.max(0, siteD - cutPositionFromRoadBoundary - 0.5);
         }
+        availableDepth = Math.min(availableDepth, maxPossibleDepth);
 
-        availableDepth = Math.max(0, availableDepth);
-
-        let area;
+        let area, depth;
         if (floor === 1) {
-          area = maxBuildingArea;
+          depth = Math.min(maxBuildingArea / buildingW, maxPossibleDepth);
+          area = buildingW * depth;
+          area = Math.min(area, maxBuildingArea);
         } else {
-          area = Math.min(maxBuildingArea, siteW * availableDepth);
+          depth = availableDepth;
+          area = buildingW * depth;
+          area = Math.min(area, maxBuildingArea);
         }
 
         if (area > remaining) area = remaining;
         if (area < 5) break;
 
-        floorAreas.push({ floor, area });
+        // 実際の奥行を面積から逆算
+        depth = area / buildingW;
+
+        floorAreas.push({
+          floor: floor,
+          area: area,
+          width: buildingW,
+          depth: depth
+        });
         remaining -= area;
         floor++;
       }
 
       const floorCount = floorAreas.length;
+      const actualBuildingArea = floorAreas.length > 0 ? floorAreas[0].area : 0;
+      const actualTotalFloor = floorAreas.reduce((sum, f) => sum + f.area, 0);
 
-      // 3D用サイズ
-      const availableDepth3d = Math.max(siteD - setback - 0.5, 1);
-      const availableWidth = siteW * 0.95;
-      let buildingW = Math.sqrt(maxBuildingArea);
-      let buildingD = buildingW;
-      if (buildingW > availableWidth) {
-        buildingW = availableWidth;
-        buildingD = maxBuildingArea / buildingW;
-      }
-      if (buildingD > availableDepth3d) {
-        buildingD = availableDepth3d;
-        buildingW = Math.min(maxBuildingArea / buildingD, availableWidth);
-      }
+      // シミュレーション建ぺい率・容積率
+      const simCoverage = (actualBuildingArea / siteArea) * 100;
+      const simFAR = (actualTotalFloor / siteArea) * 100;
+
+      // 3D用
+      let buildingD = floorAreas.length > 0 ? floorAreas[0].depth : maxPossibleDepth;
 
       // 表示
       document.getElementById('siteArea').textContent = siteArea.toFixed(2);
@@ -374,17 +398,19 @@
       document.getElementById('totalFloorArea').textContent = maxTotalFloor.toFixed(2);
       document.getElementById('slopeRatio').textContent = slope;
       document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2);
+      document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + " m" : "なし";
       document.getElementById('floors').textContent = floorCount;
 
       let html = '<strong>各階床面積（概算）</strong><br>';
-      let sum = 0;
       floorAreas.forEach(f => {
-        html += `${f.floor}階： ${f.area.toFixed(1)} ㎡<br>`;
-        sum += f.area;
+        html += `${f.floor}階： ${f.area.toFixed(1)} ㎡　（間口 ${f.width.toFixed(1)}m × 奥行 ${f.depth.toFixed(1)}m）<br>`;
       });
-      html += `<br>合計： ${sum.toFixed(1)} ㎡（最大延床 ${maxTotalFloor.toFixed(1)} ㎡）`;
-      document.getElementById('floorAreas').innerHTML = html;
+      html += `<br>合計： ${actualTotalFloor.toFixed(1)} ㎡（最大延床 ${maxTotalFloor.toFixed(1)} ㎡）<br><br>`;
+      html += `<strong>シミュレーション結果</strong><br>`;
+      html += `建ぺい率： ${simCoverage.toFixed(1)} ％（指定 ${coverage}%）<br>`;
+      html += `容積率： ${simFAR.toFixed(1)} ％（指定 ${far}%）`;
 
+      document.getElementById('floorAreas').innerHTML = html;
       document.getElementById('result').style.display = 'block';
 
       update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorCount);
