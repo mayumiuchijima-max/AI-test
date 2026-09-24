@@ -5,48 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>簡易ボリューム検討ツール</title>
   <style>
-    body {
-      font-family: sans-serif;
-      max-width: 640px;
-      margin: 20px auto;
-      padding: 16px;
-      background: #f5f5f5;
-      color: #333;
-    }
+    body { font-family: sans-serif; max-width: 640px; margin: 20px auto; padding: 16px; background: #f5f5f5; color: #333; }
     h1 { font-size: 1.3rem; margin-bottom: 16px; }
     .form-group { margin-bottom: 12px; }
     label { display: block; font-size: 0.9rem; margin-bottom: 4px; font-weight: 500; }
-    input, select {
-      width: 100%; padding: 10px; font-size: 1rem;
-      box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px;
-    }
-    button {
-      width: 100%; padding: 14px; font-size: 1.05rem;
-      background: #2563eb; color: white; border: none;
-      border-radius: 8px; cursor: pointer; margin-top: 8px;
-    }
-    button:hover { background: #1d4ed8; }
-    #result {
-      margin-top: 24px; padding: 20px; background: white;
-      border-radius: 10px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-    }
+    input, select { width: 100%; padding: 10px; font-size: 1rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+    button { width: 100%; padding: 14px; font-size: 1.05rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
+    #result { margin-top: 24px; padding: 20px; background: white; border-radius: 10px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
     .result-item { margin-bottom: 8px; font-size: 1.05rem; }
-    .floor-list {
-      margin-top: 12px;
-      padding: 12px;
-      background: #f8fafc;
-      border-radius: 8px;
-      font-size: 0.95rem;
-    }
+    .floor-list { margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 0.95rem; }
     .note { font-size: 0.8rem; color: #666; margin-top: 16px; line-height: 1.5; }
-    #canvas-container {
-      width: 100%; height: 360px; margin-top: 20px;
-      background: #e8eef7; border-radius: 8px; overflow: hidden;
-    }
+    #canvas-container { width: 100%; height: 360px; margin-top: 20px; background: #e8eef7; border-radius: 8px; overflow: hidden; }
   </style>
 </head>
 <body>
-
   <h1>簡易ボリューム検討ツール（試作版）</h1>
 
   <div class="form-group">
@@ -72,45 +44,50 @@
     <label>間口（敷地・m）</label>
     <input type="number" id="width" step="0.1" placeholder="例: 12.5">
   </div>
-
   <div class="form-group">
     <label>奥行（敷地・m）</label>
     <input type="number" id="depth" step="0.1" placeholder="例: 18.0">
   </div>
-
   <div class="form-group">
     <label>建物の間口（任意・m）</label>
-    <input type="number" id="bldgWidth" step="0.1" placeholder="指定しない場合は自動">
+    <input type="number" id="bldgWidth" step="0.1" placeholder="指定しない場合は敷地間口-1m">
   </div>
-
   <div class="form-group">
     <label>建ぺい率（%）</label>
     <input type="number" id="coverage" step="1" placeholder="例: 60">
   </div>
-
   <div class="form-group">
     <label>容積率（%）</label>
     <input type="number" id="far" step="1" placeholder="例: 200">
   </div>
-
   <div class="form-group">
     <label>前面道路幅員（m）</label>
     <input type="number" id="road" step="0.1" placeholder="例: 6.0">
   </div>
-
   <div class="form-group">
     <label>道路からのセットバック（m）</label>
-    <input type="number" id="setback" step="0.1" value="0" placeholder="例: 1.0">
+    <input type="number" id="setback" step="0.1" value="0">
   </div>
-
+  <div class="form-group">
+    <label>前面道路の方位（敷地から見て）</label>
+    <select id="roadDir">
+      <option value="north">北</option>
+      <option value="northeast">北東</option>
+      <option value="east">東</option>
+      <option value="southeast">南東</option>
+      <option value="south" selected>南</option>
+      <option value="southwest">南西</option>
+      <option value="west">西</option>
+      <option value="northwest">北西</option>
+    </select>
+  </div>
   <div class="form-group">
     <label>1階床高さ（GLから・m）</label>
-    <input type="number" id="fl1" step="0.1" value="0.5" placeholder="例: 0.5">
+    <input type="number" id="fl1" step="0.1" value="0.5">
   </div>
-
   <div class="form-group">
     <label>階高（m）</label>
-    <input type="number" id="floorHeight" step="0.1" value="3.0" placeholder="例: 3.0">
+    <input type="number" id="floorHeight" step="0.1" value="3.0">
   </div>
 
   <button onclick="calculate()">計算する</button>
@@ -119,39 +96,40 @@
     <div class="result-item">敷地面積： <strong id="siteArea"></strong> ㎡</div>
     <div class="result-item">最大建築面積： <strong id="buildingArea"></strong> ㎡</div>
     <div class="result-item">最大延床面積： <strong id="totalFloorArea"></strong> ㎡</div>
-    <div class="result-item">適用斜線勾配： <strong id="slopeRatio"></strong></div>
+    <div class="result-item">道路斜線勾配： <strong id="slopeRatio"></strong></div>
     <div class="result-item">道路に面する部分の高さ： <strong id="heightLimit"></strong> m</div>
     <div class="result-item">絶対高さ制限： <strong id="absHeight"></strong></div>
+    <div class="result-item">北側斜線： <strong id="northRuleText"></strong></div>
     <div class="result-item">おおよその階数： <strong id="floors"></strong> 階</div>
-
     <div class="floor-list" id="floorAreas"></div>
-
     <div id="canvas-container"></div>
-
     <p class="note">
-      ※これは簡易版です。<br>
-      ・各階で敷地境界から最低0.5mの離れを確保しています<br>
-      ・建物の間口未指定時は「敷地間口 − 1.0m」になります<br>
-      ・シミュレーション建ぺい率・容積率は実際に積み上げた面積から計算しています<br>
-      実際の法規確認は必ず別途行ってください。
+      ※簡易版です。<br>
+      ・前面道路の方位は、敷地から見た道路の向きです<br>
+      ・斜め方位の各階面積は概算です<br>
+      ・北側が道路のときは、斜線の立ち上がりを道路の反対側から取ります<br>
+      ・低層住専は 5m+1.25、中高層住専は 10m+1.25<br>
+      ・北側斜線の判定は各階の天井付近の高さで行います<br>
+      ・各辺から最低0.5mの離れを見込んでいます<br>
+      実際の確認申請用ではありません。
     </p>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script>
     const zoningData = {
-      "1low": { coverage: 50, far: 100, slope: 1.25, absHeight: 10 },
-      "2low": { coverage: 60, far: 150, slope: 1.25, absHeight: 10 },
-      "1mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
-      "2mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
-      "1res": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
-      "2res": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
-      "quasi": { coverage: 60, far: 200, slope: 1.25, absHeight: null },
-      "neighbor": { coverage: 80, far: 200, slope: 1.5, absHeight: null },
-      "commercial": { coverage: 80, far: 400, slope: 1.5, absHeight: null },
-      "quasi-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null },
-      "industrial": { coverage: 60, far: 200, slope: 1.5, absHeight: null },
-      "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null }
+      "1low": { coverage: 50, far: 100, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25 },
+      "2low": { coverage: 60, far: 150, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25 },
+      "1mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: 10, northSlope: 1.25 },
+      "2mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: 10, northSlope: 1.25 },
+      "1res": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null },
+      "2res": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null },
+      "quasi": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null },
+      "neighbor": { coverage: 80, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
+      "commercial": { coverage: 80, far: 400, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
+      "quasi-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
+      "industrial": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
+      "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null }
     };
 
     function applyZoning() {
@@ -163,48 +141,118 @@
     }
 
     let scene, camera, renderer, group;
-    let clipPlane = null;
-    let currentRoad = 6;
-    let currentSetback = 0;
-    let currentSlope = 1.25;
+    let clipPlanes = [];
+    let capInfos = [];
+    let currentRoad = 6, currentSetback = 0, currentSlope = 1.25;
+    let currentNorth = { enabled: false, nx: 0, nz: 1, start: 5, slope: 1.25, siteD: 10, siteW: 10, relief: 0 };
+
+    function getNorthLocals() {
+      const planes = [];
+      if (!currentNorth.enabled) return planes;
+      const nx = currentNorth.nx;
+      const nz = currentNorth.nz;
+      const s = currentNorth.slope;
+      const start = currentNorth.start;
+      const W = currentNorth.siteW;
+      const D = currentNorth.siteD;
+      const relief = currentNorth.relief || 0;
+
+      // 北を向く辺ごとに、辺に沿った北側斜線を立てる
+      if (nz > 0.001) {
+        planes.push({
+          n: new THREE.Vector3(0, -1, -s / nz).normalize(),
+          p: new THREE.Vector3(0, start, D)
+        });
+      } else if (nz < -0.001) {
+        planes.push({
+          n: new THREE.Vector3(0, -1, -s / nz).normalize(),
+          p: new THREE.Vector3(0, start, -relief)
+        });
+      }
+      if (nx > 0.001) {
+        planes.push({
+          n: new THREE.Vector3(-s / nx, -1, 0).normalize(),
+          p: new THREE.Vector3(W / 2, start, D / 2)
+        });
+      } else if (nx < -0.001) {
+        planes.push({
+          n: new THREE.Vector3(-s / nx, -1, 0).normalize(),
+          p: new THREE.Vector3(-W / 2, start, D / 2)
+        });
+      }
+      return planes;
+    }
+
+    function setWorldPlane(plane, nLocal, pLocal) {
+      const nWorld = nLocal.clone().applyQuaternion(group.quaternion);
+      const pWorld = pLocal.clone().applyMatrix4(group.matrixWorld);
+      plane.normal.copy(nWorld);
+      plane.constant = -nWorld.dot(pWorld);
+    }
+
+    function makeBoxClipLocals(cx, cy, cz, hx, hy, hz) {
+      return [
+        { n: new THREE.Vector3(-1, 0, 0), p: new THREE.Vector3(cx + hx, cy, cz) },
+        { n: new THREE.Vector3(1, 0, 0), p: new THREE.Vector3(cx - hx, cy, cz) },
+        { n: new THREE.Vector3(0, -1, 0), p: new THREE.Vector3(cx, cy + hy, cz) },
+        { n: new THREE.Vector3(0, 1, 0), p: new THREE.Vector3(cx, cy - hy, cz) },
+        { n: new THREE.Vector3(0, 0, -1), p: new THREE.Vector3(cx, cy, cz + hz) },
+        { n: new THREE.Vector3(0, 0, 1), p: new THREE.Vector3(cx, cy, cz - hz) }
+      ];
+    }
+
+    function addCap(nLocal, pLocal, color, extraClipLocals) {
+      const clips = extraClipLocals.map(function () { return new THREE.Plane(); });
+      const mat = new THREE.MeshStandardMaterial({
+        color: color,
+        metalness: 0.05,
+        roughness: 0.7,
+        side: THREE.DoubleSide,
+        clippingPlanes: clips,
+        clipShadows: true
+      });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), mat);
+      mesh.position.copy(pLocal);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), nLocal.clone().normalize());
+      group.add(mesh);
+      capInfos.push({ mesh: mesh, extra: extraClipLocals, clips: clips });
+    }
 
     function init3D() {
       const container = document.getElementById('canvas-container');
       container.innerHTML = '';
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0xe8eef7);
-
-      camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
       camera.position.set(50, 38, 60);
       camera.lookAt(0, 6, 10);
-
       renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(width, height);
+      renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.localClippingEnabled = true;
       container.appendChild(renderer.domElement);
-
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-      scene.add(ambientLight);
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
       const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
       dirLight.position.set(20, 30, 25);
       scene.add(dirLight);
     }
 
-    function updateClipPlane() {
-      if (!clipPlane || !group) return;
+    function updateClipPlanes() {
+      if (!group || clipPlanes.length === 0) return;
 
-      const localNormal = new THREE.Vector3(0, -1, currentSlope).normalize();
-      const worldNormal = localNormal.clone().applyQuaternion(group.quaternion);
+      const roadN = new THREE.Vector3(0, -1, currentSlope).normalize();
+      const roadP = new THREE.Vector3(0, 0, -currentRoad - currentSetback);
+      setWorldPlane(clipPlanes[0], roadN, roadP);
 
-      const startZ = -currentRoad - currentSetback;
-      const localPoint = new THREE.Vector3(0, 0, startZ);
-      const worldPoint = localPoint.clone().applyMatrix4(group.matrixWorld);
+      const northPlanes = getNorthLocals();
+      northPlanes.forEach(function (np, i) {
+        if (clipPlanes[i + 1]) setWorldPlane(clipPlanes[i + 1], np.n, np.p);
+      });
 
-      clipPlane.normal.copy(worldNormal);
-      clipPlane.constant = -worldNormal.dot(worldPoint);
+      capInfos.forEach(function (info) {
+        info.extra.forEach(function (ex, i) {
+          setWorldPlane(info.clips[i], ex.n, ex.p);
+        });
+      });
     }
 
     function update3D(siteW, siteD, buildingW, buildingD, setback, roadWidth, slope, fl1, floorH, floorCount) {
@@ -217,71 +265,115 @@
 
       group = new THREE.Group();
 
-      // 道路
-      const roadGeo = new THREE.PlaneGeometry(siteW + 14, roadWidth);
-      const roadMat = new THREE.MeshStandardMaterial({ color: 0x6b7280 });
-      const road = new THREE.Mesh(roadGeo, roadMat);
+      const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(siteW + 14, roadWidth),
+        new THREE.MeshStandardMaterial({ color: 0x6b7280 })
+      );
       road.rotation.x = -Math.PI / 2;
       road.position.set(0, 0.01, -roadWidth / 2);
       group.add(road);
 
-      // 敷地
       const siteGeo = new THREE.PlaneGeometry(siteW, siteD);
-      const siteMat = new THREE.MeshStandardMaterial({ 
-        color: 0x93c5fd, transparent: true, opacity: 0.6
-      });
-      const site = new THREE.Mesh(siteGeo, siteMat);
+      const site = new THREE.Mesh(siteGeo, new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.6 }));
       site.rotation.x = -Math.PI / 2;
       site.position.set(0, 0.02, siteD / 2);
       group.add(site);
 
-      // 敷地枠線
-      const edges = new THREE.EdgesGeometry(siteGeo);
-      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x1e40af }));
+      const line = new THREE.LineSegments(new THREE.EdgesGeometry(siteGeo), new THREE.LineBasicMaterial({ color: 0x1e40af }));
       line.rotation.x = -Math.PI / 2;
       line.position.set(0, 0.03, siteD / 2);
       group.add(line);
 
-      // クリッピング平面
-      clipPlane = new THREE.Plane();
-
-      const buildingHeight = fl1 + floorCount * floorH + 2.0;
-
-      const buildingGeo = new THREE.BoxGeometry(buildingW, buildingHeight, buildingD);
-      const buildingMat = new THREE.MeshStandardMaterial({ 
-        color: 0x3b82f6,
+      const markCanvas = document.createElement('canvas');
+      markCanvas.width = 128;
+      markCanvas.height = 128;
+      const mctx = markCanvas.getContext('2d');
+      mctx.fillStyle = '#dc2626';
+      mctx.beginPath();
+      mctx.moveTo(64, 10);
+      mctx.lineTo(112, 112);
+      mctx.lineTo(64, 90);
+      mctx.lineTo(16, 112);
+      mctx.closePath();
+      mctx.fill();
+      mctx.fillStyle = '#ffffff';
+      mctx.font = 'bold 44px sans-serif';
+      mctx.textAlign = 'center';
+      mctx.textBaseline = 'middle';
+      mctx.fillText('北', 64, 68);
+      const markMat = new THREE.MeshBasicMaterial({
+        map: new THREE.CanvasTexture(markCanvas),
         transparent: true,
-        opacity: 0.88,
-        clippingPlanes: [clipPlane],
-        clipShadows: true,
         side: THREE.DoubleSide
       });
-      const building = new THREE.Mesh(buildingGeo, buildingMat);
-      building.position.set(0, buildingHeight / 2, setback + buildingD / 2);
+      const northMark = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), markMat);
+      northMark.rotation.order = 'YXZ';
+      const gap = 2.2;
+      const nx = currentNorth.nx;
+      const nz = currentNorth.nz;
+      const x0 = (nx > 0.001) ? siteW / 2 : (nx < -0.001 ? -siteW / 2 : 0);
+      const z0 = (nz > 0.001) ? siteD : (nz < -0.001 ? 0 : siteD / 2);
+      northMark.position.set(x0 + nx * gap, 0.06, z0 + nz * gap);
+      const rotY = Math.atan2(-nx, -nz);
+      northMark.rotation.set(-Math.PI / 2, rotY, 0);
+      group.add(northMark);
+
+      clipPlanes = [new THREE.Plane()];
+      getNorthLocals().forEach(function () {
+        clipPlanes.push(new THREE.Plane());
+      });
+      capInfos = [];
+
+      const buildingHeight = fl1 + floorCount * floorH + 2.0;
+      const building = new THREE.Mesh(
+        new THREE.BoxGeometry(buildingW, buildingHeight, buildingD),
+        new THREE.MeshStandardMaterial({
+          color: 0x3b82f6,
+          transparent: false,
+          opacity: 1,
+          clippingPlanes: clipPlanes,
+          clipShadows: true,
+          side: THREE.DoubleSide
+        })
+      );
+      const bx = 0;
+      const by = buildingHeight / 2;
+      const bz = setback + buildingD / 2;
+      building.position.set(bx, by, bz);
       group.add(building);
 
-      // FL線
+      const boxLocals = makeBoxClipLocals(bx, by, bz, buildingW / 2 + 0.02, buildingHeight / 2 + 0.02, buildingD / 2 + 0.02);
+      const roadN = new THREE.Vector3(0, -1, currentSlope).normalize();
+      const roadP = new THREE.Vector3(0, 0, -currentRoad - currentSetback);
+
+      const northPlanes = getNorthLocals();
+      addCap(roadN, roadP, 0xfb923c, boxLocals.concat(northPlanes));
+      northPlanes.forEach(function (np, i) {
+        const others = [{ n: roadN, p: roadP }].concat(northPlanes.filter(function (_, j) { return j !== i; }));
+        addCap(np.n, np.p, 0x86efac, boxLocals.concat(others));
+      });
+
       const flMat = new THREE.LineBasicMaterial({ color: 0xf59e0b });
       for (let i = 0; i <= floorCount; i++) {
-        const flHeight = fl1 + (i * floorH);
+        const h = fl1 + i * floorH;
         const flGeo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(-buildingW/2 - 0.15, flHeight, setback),
-          new THREE.Vector3(buildingW/2 + 0.15, flHeight, setback),
-          new THREE.Vector3(buildingW/2 + 0.15, flHeight, setback + buildingD),
-          new THREE.Vector3(-buildingW/2 - 0.15, flHeight, setback + buildingD),
-          new THREE.Vector3(-buildingW/2 - 0.15, flHeight, setback)
+          new THREE.Vector3(-buildingW / 2 - 0.15, h, setback),
+          new THREE.Vector3(buildingW / 2 + 0.15, h, setback),
+          new THREE.Vector3(buildingW / 2 + 0.15, h, setback + buildingD),
+          new THREE.Vector3(-buildingW / 2 - 0.15, h, setback + buildingD),
+          new THREE.Vector3(-buildingW / 2 - 0.15, h, setback)
         ]);
         group.add(new THREE.Line(flGeo, flMat));
       }
 
       scene.add(group);
-      updateClipPlane();
+      updateClipPlanes();
 
       function animate() {
         requestAnimationFrame(animate);
         if (group) {
           group.rotation.y += 0.004;
-          updateClipPlane();
+          updateClipPlanes();
         }
         renderer.render(scene, camera);
       }
@@ -299,123 +391,135 @@
       const fl1 = parseFloat(document.getElementById('fl1').value) || 0.5;
       const floorH = parseFloat(document.getElementById('floorHeight').value) || 3.0;
       const zoningKey = document.getElementById('zoning').value;
+      const roadDir = document.getElementById('roadDir').value;
+      const roadDirNames = {
+        north: '北', northeast: '北東', east: '東', southeast: '南東',
+        south: '南', southwest: '南西', west: '西', northwest: '北西'
+      };
+      const roadDirName = roadDirNames[roadDir] || '南';
+      // 敷地から見た道路の方位 → 真北ベクトル（X:右, Z:奥）
+      const roadToNorthVec = {
+        south: { nx: 0, nz: 1 },
+        north: { nx: 0, nz: -1 },
+        west: { nx: 1, nz: 0 },
+        east: { nx: -1, nz: 0 },
+        southwest: { nx: 0.7071, nz: 0.7071 },
+        southeast: { nx: -0.7071, nz: 0.7071 },
+        northwest: { nx: 0.7071, nz: -0.7071 },
+        northeast: { nx: -0.7071, nz: -0.7071 }
+      };
+      const nvec = roadToNorthVec[roadDir] || { nx: 0, nz: 1 };
 
       if (!siteW || !siteD || !coverage || !far || !road) {
         alert('主要な項目を入力してください');
         return;
       }
 
-      let slope = 1.25;
-      let absHeight = null;
-      if (zoningKey && zoningData[zoningKey]) {
-        slope = zoningData[zoningKey].slope;
-        absHeight = zoningData[zoningKey].absHeight;
-      }
+      const z = (zoningKey && zoningData[zoningKey])
+        ? zoningData[zoningKey]
+        : { slope: 1.25, absHeight: null, northStart: null, northSlope: null };
 
+      const slope = z.slope;
+      const absHeight = z.absHeight;
       const siteArea = siteW * siteD;
       const maxBuildingArea = siteArea * (coverage / 100);
       const maxTotalFloor = siteArea * (far / 100);
       let frontHeightLimit = (road + setback) * slope;
+      if (absHeight !== null) frontHeightLimit = Math.min(frontHeightLimit, absHeight);
 
-      if (absHeight !== null) {
-        frontHeightLimit = Math.min(frontHeightLimit, absHeight);
-      }
-
-      // 建物間口
-      let buildingW;
-      if (bldgWInput && bldgWInput > 0) {
-        buildingW = Math.min(bldgWInput, siteW - 1.0);
-      } else {
-        buildingW = siteW - 1.0; // 未指定時は敷地間口−1m
-      }
+      let buildingW = (bldgWInput && bldgWInput > 0) ? Math.min(bldgWInput, siteW - 1.0) : (siteW - 1.0);
       if (buildingW < 1) buildingW = 1;
-
       const maxPossibleDepth = Math.max(siteD - setback - 0.5, 1);
 
-      // ===== 各階面積計算 =====
+      const northRelief = road * Math.max(0, -nvec.nz);
+      currentNorth = {
+        enabled: z.northStart !== null,
+        nx: nvec.nx,
+        nz: nvec.nz,
+        start: z.northStart || 5,
+        slope: z.northSlope || 1.25,
+        siteD: siteD,
+        siteW: siteW,
+        relief: northRelief
+      };
+
       const floorAreas = [];
       let remaining = maxTotalFloor;
-      let floor = 1;
-      const maxFloors = 15;
 
-      while (remaining > 5 && floor <= maxFloors) {
+      for (let floor = 1; floor <= 15 && remaining > 5; floor++) {
         const flHeight = fl1 + (floor - 1) * floorH;
-
         if (absHeight !== null && flHeight > absHeight) break;
 
         const distFromOpposite = flHeight / slope;
-        const cutPositionFromRoadBoundary = distFromOpposite - road;
+        const cutFromRoad = distFromOpposite - road;
+        let depthByRoad = (cutFromRoad <= setback) ? maxPossibleDepth : Math.max(0, siteD - cutFromRoad - 0.5);
+        depthByRoad = Math.min(depthByRoad, maxPossibleDepth);
 
-        let availableDepth;
-        if (cutPositionFromRoadBoundary <= setback) {
-          availableDepth = maxPossibleDepth;
-        } else {
-          availableDepth = Math.max(0, siteD - cutPositionFromRoadBoundary - 0.5);
+        let availW = buildingW;
+        let availD = depthByRoad;
+
+        const checkH = fl1 + floor * floorH;
+        if (z.northStart !== null) {
+          const raw = Math.max(0, (checkH - z.northStart) / z.northSlope);
+          const extra = Math.max(0, raw - northRelief);
+          const cutD = extra * Math.abs(nvec.nz);
+          const cutW = extra * Math.abs(nvec.nx);
+          availD = Math.min(availD, Math.max(0, siteD - setback - 0.5 - cutD));
+          availW = Math.min(availW, Math.max(1, siteW - 1.0 - cutW));
         }
-        availableDepth = Math.min(availableDepth, maxPossibleDepth);
 
-        let area, depth;
+        let area = availW * availD;
         if (floor === 1) {
-          depth = Math.min(maxBuildingArea / buildingW, maxPossibleDepth);
-          area = buildingW * depth;
           area = Math.min(area, maxBuildingArea);
         } else {
-          depth = availableDepth;
-          area = buildingW * depth;
           area = Math.min(area, maxBuildingArea);
         }
-
         if (area > remaining) area = remaining;
         if (area < 5) break;
 
-        // 実際の奥行を面積から逆算
-        depth = area / buildingW;
+        const usedW = availW;
+        const usedD = area / usedW;
 
-        floorAreas.push({
-          floor: floor,
-          area: area,
-          width: buildingW,
-          depth: depth
-        });
+        floorAreas.push({ floor: floor, area: area, width: usedW, depth: usedD });
         remaining -= area;
-        floor++;
       }
 
-      const floorCount = floorAreas.length;
-      const actualBuildingArea = floorAreas.length > 0 ? floorAreas[0].area : 0;
-      const actualTotalFloor = floorAreas.reduce((sum, f) => sum + f.area, 0);
-
-      // シミュレーション建ぺい率・容積率
+      const actualBuildingArea = floorAreas[0] ? floorAreas[0].area : 0;
+      const actualTotalFloor = floorAreas.reduce(function (s, f) { return s + f.area; }, 0);
       const simCoverage = (actualBuildingArea / siteArea) * 100;
       const simFAR = (actualTotalFloor / siteArea) * 100;
+      const buildingD = floorAreas[0] ? floorAreas[0].depth : maxPossibleDepth;
 
-      // 3D用
-      let buildingD = floorAreas.length > 0 ? floorAreas[0].depth : maxPossibleDepth;
-
-      // 表示
       document.getElementById('siteArea').textContent = siteArea.toFixed(2);
       document.getElementById('buildingArea').textContent = maxBuildingArea.toFixed(2);
       document.getElementById('totalFloorArea').textContent = maxTotalFloor.toFixed(2);
       document.getElementById('slopeRatio').textContent = slope;
       document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2);
-      document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + " m" : "なし";
-      document.getElementById('floors').textContent = floorCount;
+      document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
+
+      let northLabel = 'この用途地域では原則なし';
+      if (z.northStart !== null) {
+        northLabel = z.northStart + 'm + ' + z.northSlope + '（道路は' + roadDirName + '）';
+        if (northRelief > 0.01) {
+          northLabel += '／北側道路緩和 ' + northRelief.toFixed(2) + 'm';
+        }
+      }
+      document.getElementById('northRuleText').textContent = northLabel;
+      document.getElementById('floors').textContent = floorAreas.length;
 
       let html = '<strong>各階床面積（概算）</strong><br>';
-      floorAreas.forEach(f => {
-        html += `${f.floor}階： ${f.area.toFixed(1)} ㎡　（間口 ${f.width.toFixed(1)}m × 奥行 ${f.depth.toFixed(1)}m）<br>`;
+      floorAreas.forEach(function (f) {
+        html += f.floor + '階： ' + f.area.toFixed(1) + ' ㎡　（間口 ' + f.width.toFixed(1) + 'm × 奥行 ' + f.depth.toFixed(1) + 'm）<br>';
       });
-      html += `<br>合計： ${actualTotalFloor.toFixed(1)} ㎡（最大延床 ${maxTotalFloor.toFixed(1)} ㎡）<br><br>`;
-      html += `<strong>シミュレーション結果</strong><br>`;
-      html += `建ぺい率： ${simCoverage.toFixed(1)} ％（指定 ${coverage}%）<br>`;
-      html += `容積率： ${simFAR.toFixed(1)} ％（指定 ${far}%）`;
-
+      html += '<br>合計： ' + actualTotalFloor.toFixed(1) + ' ㎡（最大延床 ' + maxTotalFloor.toFixed(1) + ' ㎡）<br><br>';
+      html += '<strong>シミュレーション結果</strong><br>';
+      html += '建ぺい率： ' + simCoverage.toFixed(1) + ' ％（指定 ' + coverage + '%）<br>';
+      html += '容積率： ' + simFAR.toFixed(1) + ' ％（指定 ' + far + '%）';
       document.getElementById('floorAreas').innerHTML = html;
       document.getElementById('result').style.display = 'block';
 
-      update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorCount);
+      update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorAreas.length);
     }
   </script>
-
 </body>
 </html>
