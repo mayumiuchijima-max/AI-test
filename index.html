@@ -82,7 +82,27 @@
     </select>
   </div>
   <div class="form-group">
-    <label>1階床高さ（GLから・m）</label>
+    <label>高度地区</label>
+    <select id="heightDistrict">
+      <option value="">なし</option>
+      <option value="h1">第一種（5m＋0.6）</option>
+      <option value="h2">第二種（5m＋1.25、8m超は0.6）</option>
+      <option value="h3">第三種（10m＋1.25、8m超は0.6）</option>
+      <option value="custom">手入力（立ち上がり＋勾配）</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>高度斜線の立ち上がり（手入力・m）</label>
+    <input type="number" id="heightRise" step="0.1" placeholder="例: 5">
+  </div>
+  <div class="form-group">
+    <label>高度斜線の勾配（手入力）</label>
+    <input type="number" id="heightSlope" step="0.05" placeholder="例: 0.6">
+  </div>
+  <div class="form-group">
+    <label>絶対高さ（任意・m）</label>
+    <input type="number" id="absHeightInput" step="0.1" placeholder="用途地域の制限より厳しい場合など">
+  </div>
     <input type="number" id="fl1" step="0.1" value="0.5">
   </div>
   <div class="form-group">
@@ -100,6 +120,7 @@
     <div class="result-item">道路に面する部分の高さ： <strong id="heightLimit"></strong> m</div>
     <div class="result-item">絶対高さ制限： <strong id="absHeight"></strong></div>
     <div class="result-item">北側斜線： <strong id="northRuleText"></strong></div>
+    <div class="result-item">高度斜線： <strong id="heightRuleText"></strong></div>
     <div class="result-item">おおよその階数： <strong id="floors"></strong> 階</div>
     <div class="floor-list" id="floorAreas"></div>
     <div id="canvas-container"></div>
@@ -108,7 +129,9 @@
       ・前面道路の方位は、敷地から見た道路の向きです<br>
       ・斜め方位の各階面積は概算です<br>
       ・北側が道路のときは、斜線の立ち上がりを道路の反対側から取ります<br>
-      ・低層住専は 5m+1.25、中高層住専は 10m+1.25<br>
+      ・高度地区は東京などでよく使う型です。自治体により式が違います<br>
+      ・第二種・第三種の折れ線は面積計算に反映し、3Dは手前側の勾配で近似します<br>
+      ・絶対高さを入れると、用途地域の制限と厳しい方を使います<br>
       ・北側斜線の判定は各階の天井付近の高さで行います<br>
       ・各辺から最低0.5mの離れを見込んでいます<br>
       実際の確認申請用ではありません。
@@ -145,19 +168,18 @@
     let capInfos = [];
     let currentRoad = 6, currentSetback = 0, currentSlope = 1.25;
     let currentNorth = { enabled: false, nx: 0, nz: 1, start: 5, slope: 1.25, siteD: 10, siteW: 10, relief: 0 };
+    let currentHeight = { enabled: false, nx: 0, nz: 1, start: 5, slope: 0.6, siteD: 10, siteW: 10, relief: 0 };
 
-    function getNorthLocals() {
+    function edgePlanes(rule) {
       const planes = [];
-      if (!currentNorth.enabled) return planes;
-      const nx = currentNorth.nx;
-      const nz = currentNorth.nz;
-      const s = currentNorth.slope;
-      const start = currentNorth.start;
-      const W = currentNorth.siteW;
-      const D = currentNorth.siteD;
-      const relief = currentNorth.relief || 0;
-
-      // 北を向く辺ごとに、辺に沿った北側斜線を立てる
+      if (!rule || !rule.enabled) return planes;
+      const nx = rule.nx;
+      const nz = rule.nz;
+      const s = rule.slope;
+      const start = rule.start;
+      const W = rule.siteW;
+      const D = rule.siteD;
+      const relief = rule.relief || 0;
       if (nz > 0.001) {
         planes.push({
           n: new THREE.Vector3(0, -1, -s / nz).normalize(),
@@ -181,6 +203,10 @@
         });
       }
       return planes;
+    }
+
+    function getNorthLocals() {
+      return edgePlanes(currentNorth).concat(edgePlanes(currentHeight));
     }
 
     function setWorldPlane(plane, nLocal, pLocal) {
@@ -346,11 +372,16 @@
       const roadN = new THREE.Vector3(0, -1, currentSlope).normalize();
       const roadP = new THREE.Vector3(0, 0, -currentRoad - currentSetback);
 
-      const northPlanes = getNorthLocals();
-      addCap(roadN, roadP, 0xfb923c, boxLocals.concat(northPlanes));
+      const northPlanes = edgePlanes(currentNorth);
+      const heightPlanes = edgePlanes(currentHeight);
+      addCap(roadN, roadP, 0xfb923c, boxLocals.concat(northPlanes).concat(heightPlanes));
       northPlanes.forEach(function (np, i) {
-        const others = [{ n: roadN, p: roadP }].concat(northPlanes.filter(function (_, j) { return j !== i; }));
+        const others = [{ n: roadN, p: roadP }].concat(northPlanes.filter(function (_, j) { return j !== i; })).concat(heightPlanes);
         addCap(np.n, np.p, 0x86efac, boxLocals.concat(others));
+      });
+      heightPlanes.forEach(function (hp, i) {
+        const others = [{ n: roadN, p: roadP }].concat(northPlanes).concat(heightPlanes.filter(function (_, j) { return j !== i; }));
+        addCap(hp.n, hp.p, 0xfacc15, boxLocals.concat(others));
       });
 
       const flMat = new THREE.LineBasicMaterial({ color: 0xf59e0b });
@@ -391,6 +422,10 @@
       const fl1 = parseFloat(document.getElementById('fl1').value) || 0.5;
       const floorH = parseFloat(document.getElementById('floorHeight').value) || 3.0;
       const zoningKey = document.getElementById('zoning').value;
+      const absInput = parseFloat(document.getElementById('absHeightInput').value);
+      const heightKind = document.getElementById('heightDistrict').value;
+      const heightRise = parseFloat(document.getElementById('heightRise').value);
+      const heightSlopeIn = parseFloat(document.getElementById('heightSlope').value);
       const roadDir = document.getElementById('roadDir').value;
       const roadDirNames = {
         north: '北', northeast: '北東', east: '東', southeast: '南東',
@@ -420,7 +455,10 @@
         : { slope: 1.25, absHeight: null, northStart: null, northSlope: null };
 
       const slope = z.slope;
-      const absHeight = z.absHeight;
+      let absHeight = z.absHeight;
+      if (!isNaN(absInput) && absInput > 0) {
+        absHeight = absHeight !== null ? Math.min(absHeight, absInput) : absInput;
+      }
       const siteArea = siteW * siteD;
       const maxBuildingArea = siteArea * (coverage / 100);
       const maxTotalFloor = siteArea * (far / 100);
@@ -443,6 +481,39 @@
         relief: northRelief
       };
 
+      let heightRule = null;
+      if (heightKind === 'h1') heightRule = { start: 5, slope: 0.6, label: '第一種 5m＋0.6' };
+      else if (heightKind === 'h2') heightRule = { start: 5, slope: 1.25, label: '第二種 5m＋1.25（8m超は15m＋0.6）' };
+      else if (heightKind === 'h3') heightRule = { start: 10, slope: 1.25, label: '第三種 10m＋1.25（8m超は20m＋0.6）' };
+      else if (heightKind === 'custom' && !isNaN(heightRise) && heightSlopeIn > 0) {
+        heightRule = { start: heightRise, slope: heightSlopeIn, label: '手入力 ' + heightRise + 'm＋' + heightSlopeIn };
+      }
+      currentHeight = {
+        enabled: !!heightRule,
+        nx: nvec.nx,
+        nz: nvec.nz,
+        start: heightRule ? heightRule.start : 5,
+        slope: heightRule ? heightRule.slope : 0.6,
+        siteD: siteD,
+        siteW: siteW,
+        relief: northRelief
+      };
+
+      function heightSetback(checkH) {
+        if (!heightRule) return 0;
+        let need = 0;
+        if (heightKind === 'h2') {
+          if (checkH <= 15) need = Math.max(0, (checkH - 5) / 1.25);
+          else need = 8 + (checkH - 15) / 0.6;
+        } else if (heightKind === 'h3') {
+          if (checkH <= 20) need = Math.max(0, (checkH - 10) / 1.25);
+          else need = 8 + (checkH - 20) / 0.6;
+        } else {
+          need = Math.max(0, (checkH - heightRule.start) / heightRule.slope);
+        }
+        return Math.max(0, need - northRelief);
+      }
+
       const floorAreas = [];
       let remaining = maxTotalFloor;
 
@@ -459,9 +530,13 @@
         let availD = depthByRoad;
 
         const checkH = fl1 + floor * floorH;
-        if (z.northStart !== null) {
-          const raw = Math.max(0, (checkH - z.northStart) / z.northSlope);
-          const extra = Math.max(0, raw - northRelief);
+        if (z.northStart !== null || heightRule) {
+          let extra = 0;
+          if (z.northStart !== null) {
+            const raw = Math.max(0, (checkH - z.northStart) / z.northSlope);
+            extra = Math.max(0, raw - northRelief);
+          }
+          extra = Math.max(extra, heightSetback(checkH));
           const cutD = extra * Math.abs(nvec.nz);
           const cutW = extra * Math.abs(nvec.nx);
           availD = Math.min(availD, Math.max(0, siteD - setback - 0.5 - cutD));
@@ -496,6 +571,7 @@
       document.getElementById('slopeRatio').textContent = slope;
       document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2);
       document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
+      document.getElementById('heightRuleText').textContent = heightRule ? heightRule.label : 'なし';
 
       let northLabel = 'この用途地域では原則なし';
       if (z.northStart !== null) {
