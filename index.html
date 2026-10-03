@@ -16,6 +16,15 @@
     .floor-list { margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 0.95rem; }
     .note { font-size: 0.8rem; color: #666; margin-top: 16px; line-height: 1.5; }
     #canvas-container { width: 100%; height: 360px; margin-top: 20px; background: #e8eef7; border-radius: 8px; overflow: hidden; }
+  .compass { width: 220px; height: 220px; margin: 8px auto 4px; position: relative; touch-action: none; user-select: none; }
+  .compass-face { width: 220px; height: 220px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #fff, #dbe7f5 70%, #c5d4ea); border: 2px solid #1e3a8a; position: relative; }
+  .compass-tick { position: absolute; left: 50%; top: 50%; width: 2px; background: #64748b; transform-origin: center bottom; }
+  .compass-tick.major { background: #1e3a8a; width: 3px; }
+  .compass-name { position: absolute; left: 50%; top: 50%; font-size: 13px; font-weight: 700; color: #1e3a8a; transform: translate(-50%, -50%); }
+  .compass-name.small { font-size: 9px; font-weight: 500; color: #475569; }
+  .compass-needle { position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 84px solid #dc2626; margin-left: -9px; margin-top: -84px; transform-origin: 50% 100%; pointer-events: none; z-index: 3; }
+  .compass-hub { position: absolute; left: 50%; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: #1e3a8a; z-index: 2; }
+  .compass-caption { text-align: center; font-size: 0.95rem; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -27,6 +36,7 @@
       <option value="">選択してください</option>
       <option value="1low">第一種低層住居専用地域</option>
       <option value="2low">第二種低層住居専用地域</option>
+      <option value="rural">田園住居地域</option>
       <option value="1mid">第一種中高層住居専用地域</option>
       <option value="2mid">第二種中高層住居専用地域</option>
       <option value="1res">第一種住居地域</option>
@@ -70,16 +80,13 @@
   </div>
   <div class="form-group">
     <label>前面道路の方位（敷地から見て）</label>
-    <select id="roadDir">
-      <option value="north">北</option>
-      <option value="northeast">北東</option>
-      <option value="east">東</option>
-      <option value="southeast">南東</option>
-      <option value="south" selected>南</option>
-      <option value="southwest">南西</option>
-      <option value="west">西</option>
-      <option value="northwest">北西</option>
-    </select>
+    <div class="compass" id="compass">
+      <div class="compass-face" id="compassFace"></div>
+      <div class="compass-needle" id="compassNeedle"></div>
+      <div class="compass-hub"></div>
+    </div>
+    <div class="compass-caption">道路は <strong id="compassLabel">南</strong></div>
+    <input type="hidden" id="roadDir" value="south">
   </div>
   <div class="form-group">
     <label>高度地区</label>
@@ -103,6 +110,8 @@
     <label>絶対高さ（任意・m）</label>
     <input type="number" id="absHeightInput" step="0.1" placeholder="用途地域の制限より厳しい場合など">
   </div>
+  <div class="form-group">
+    <label>1階床高さ（GLから・m）</label>
     <input type="number" id="fl1" step="0.1" value="0.5">
   </div>
   <div class="form-group">
@@ -121,6 +130,7 @@
     <div class="result-item">絶対高さ制限： <strong id="absHeight"></strong></div>
     <div class="result-item">北側斜線： <strong id="northRuleText"></strong></div>
     <div class="result-item">高度斜線： <strong id="heightRuleText"></strong></div>
+    <div class="result-item">隣地斜線： <strong id="adjRuleText"></strong></div>
     <div class="result-item">おおよその階数： <strong id="floors"></strong> 階</div>
     <div class="floor-list" id="floorAreas"></div>
     <div id="canvas-container"></div>
@@ -133,7 +143,7 @@
       ・第二種・第三種の折れ線は面積計算に反映し、3Dは手前側の勾配で近似します<br>
       ・絶対高さを入れると、用途地域の制限と厳しい方を使います<br>
       ・北側斜線の判定は各階の天井付近の高さで行います<br>
-      ・各辺から最低0.5mの離れを見込んでいます<br>
+      ・隣地斜線は道路以外の3辺から。低層・田園はなし、住居系は20m＋1.25、商業・工業系は31m＋2.5<br>
       実際の確認申請用ではありません。
     </p>
   </div>
@@ -141,18 +151,19 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script>
     const zoningData = {
-      "1low": { coverage: 50, far: 100, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25 },
-      "2low": { coverage: 60, far: 150, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25 },
-      "1mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: 10, northSlope: 1.25 },
-      "2mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: 10, northSlope: 1.25 },
-      "1res": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null },
-      "2res": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null },
-      "quasi": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null },
-      "neighbor": { coverage: 80, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
-      "commercial": { coverage: 80, far: 400, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
-      "quasi-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
-      "industrial": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null },
-      "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null }
+      "1low": { coverage: 50, far: 100, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25, adjStart: null, adjSlope: null },
+      "2low": { coverage: 60, far: 150, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25, adjStart: null, adjSlope: null },
+      "rural": { coverage: 30, far: 80, slope: 1.25, absHeight: 10, northStart: 5, northSlope: 1.25, adjStart: null, adjSlope: null },
+      "1mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: 10, northSlope: 1.25, adjStart: 20, adjSlope: 1.25 },
+      "2mid": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: 10, northSlope: 1.25, adjStart: 20, adjSlope: 1.25 },
+      "1res": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null, adjStart: 20, adjSlope: 1.25 },
+      "2res": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null, adjStart: 20, adjSlope: 1.25 },
+      "quasi": { coverage: 60, far: 200, slope: 1.25, absHeight: null, northStart: null, northSlope: null, adjStart: 20, adjSlope: 1.25 },
+      "neighbor": { coverage: 80, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 },
+      "commercial": { coverage: 80, far: 400, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 },
+      "quasi-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 },
+      "industrial": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 },
+      "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 }
     };
 
     function applyZoning() {
@@ -163,12 +174,79 @@
       }
     }
 
+    const ROAD_DIRS = [
+      ['north', '北'], ['nne', '北北東'], ['northeast', '北東'], ['ene', '東北東'],
+      ['east', '東'], ['ese', '東南東'], ['southeast', '南東'], ['sse', '南南東'],
+      ['south', '南'], ['ssw', '南南西'], ['southwest', '南西'], ['wsw', '西南西'],
+      ['west', '西'], ['wnw', '西北西'], ['northwest', '北西'], ['nnw', '北北西']
+    ].map(function (item, i) {
+      const deg = i * 22.5;
+      const rad = deg * Math.PI / 180;
+      return { key: item[0], name: item[1], deg: deg, nx: -Math.sin(rad), nz: -Math.cos(rad) };
+    });
+    let compassIndex = 8;
+
+    function setCompass(index) {
+      compassIndex = ((index % 16) + 16) % 16;
+      const d = ROAD_DIRS[compassIndex];
+      document.getElementById('roadDir').value = d.key;
+      document.getElementById('compassLabel').textContent = d.name;
+      document.getElementById('compassNeedle').style.transform = 'rotate(' + d.deg + 'deg)';
+    }
+
+    function initCompass() {
+      const face = document.getElementById('compassFace');
+      ROAD_DIRS.forEach(function (d, i) {
+        if (i % 2 !== 0) return;
+        const label = document.createElement('div');
+        label.className = 'compass-name';
+        label.textContent = d.name;
+        const rad = (d.deg - 90) * Math.PI / 180;
+        const r = 72;
+        label.style.left = (110 + Math.cos(rad) * r) + 'px';
+        label.style.top = (110 + Math.sin(rad) * r) + 'px';
+        face.appendChild(label);
+      });
+      const compass = document.getElementById('compass');
+      function pick(ev) {
+        const rect = compass.getBoundingClientRect();
+        const x = (ev.clientX || ev.touches[0].clientX) - rect.left - rect.width / 2;
+        const y = (ev.clientY || ev.touches[0].clientY) - rect.top - rect.height / 2;
+        let deg = Math.atan2(x, -y) * 180 / Math.PI;
+        if (deg < 0) deg += 360;
+        setCompass(Math.round(deg / 22.5) % 16);
+      }
+      compass.addEventListener('pointerdown', function (ev) {
+        compass.setPointerCapture(ev.pointerId);
+        pick(ev);
+      });
+      compass.addEventListener('pointermove', function (ev) {
+        if (ev.buttons) pick(ev);
+      });
+      setCompass(8);
+    }
+    initCompass();
+
     let scene, camera, renderer, group;
     let clipPlanes = [];
     let capInfos = [];
     let currentRoad = 6, currentSetback = 0, currentSlope = 1.25;
     let currentNorth = { enabled: false, nx: 0, nz: 1, start: 5, slope: 1.25, siteD: 10, siteW: 10, relief: 0 };
     let currentHeight = { enabled: false, nx: 0, nz: 1, start: 5, slope: 0.6, siteD: 10, siteW: 10, relief: 0 };
+    let currentAdj = { enabled: false, start: 20, slope: 1.25, siteD: 10, siteW: 10 };
+
+    function adjPlanes() {
+      if (!currentAdj.enabled) return [];
+      const s = currentAdj.slope;
+      const start = currentAdj.start;
+      const W = currentAdj.siteW;
+      const D = currentAdj.siteD;
+      return [
+        { n: new THREE.Vector3(0, -1, -s).normalize(), p: new THREE.Vector3(0, start, D) },
+        { n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2, start, D / 2) },
+        { n: new THREE.Vector3(-s, -1, 0).normalize(), p: new THREE.Vector3(W / 2, start, D / 2) }
+      ];
+    }
 
     function edgePlanes(rule) {
       const planes = [];
@@ -206,7 +284,7 @@
     }
 
     function getNorthLocals() {
-      return edgePlanes(currentNorth).concat(edgePlanes(currentHeight));
+      return edgePlanes(currentNorth).concat(edgePlanes(currentHeight)).concat(adjPlanes());
     }
 
     function setWorldPlane(plane, nLocal, pLocal) {
@@ -374,14 +452,20 @@
 
       const northPlanes = edgePlanes(currentNorth);
       const heightPlanes = edgePlanes(currentHeight);
-      addCap(roadN, roadP, 0xfb923c, boxLocals.concat(northPlanes).concat(heightPlanes));
+      const sidePlanes = adjPlanes();
+      const allSlope = northPlanes.concat(heightPlanes).concat(sidePlanes);
+      addCap(roadN, roadP, 0xfb923c, boxLocals.concat(allSlope));
       northPlanes.forEach(function (np, i) {
-        const others = [{ n: roadN, p: roadP }].concat(northPlanes.filter(function (_, j) { return j !== i; })).concat(heightPlanes);
+        const others = [{ n: roadN, p: roadP }].concat(allSlope.filter(function (p) { return p !== np; }));
         addCap(np.n, np.p, 0x86efac, boxLocals.concat(others));
       });
-      heightPlanes.forEach(function (hp, i) {
-        const others = [{ n: roadN, p: roadP }].concat(northPlanes).concat(heightPlanes.filter(function (_, j) { return j !== i; }));
+      heightPlanes.forEach(function (hp) {
+        const others = [{ n: roadN, p: roadP }].concat(allSlope.filter(function (p) { return p !== hp; }));
         addCap(hp.n, hp.p, 0xfacc15, boxLocals.concat(others));
+      });
+      sidePlanes.forEach(function (sp) {
+        const others = [{ n: roadN, p: roadP }].concat(allSlope.filter(function (p) { return p !== sp; }));
+        addCap(sp.n, sp.p, 0xc084fc, boxLocals.concat(others));
       });
 
       const flMat = new THREE.LineBasicMaterial({ color: 0xf59e0b });
@@ -427,23 +511,9 @@
       const heightRise = parseFloat(document.getElementById('heightRise').value);
       const heightSlopeIn = parseFloat(document.getElementById('heightSlope').value);
       const roadDir = document.getElementById('roadDir').value;
-      const roadDirNames = {
-        north: '北', northeast: '北東', east: '東', southeast: '南東',
-        south: '南', southwest: '南西', west: '西', northwest: '北西'
-      };
-      const roadDirName = roadDirNames[roadDir] || '南';
-      // 敷地から見た道路の方位 → 真北ベクトル（X:右, Z:奥）
-      const roadToNorthVec = {
-        south: { nx: 0, nz: 1 },
-        north: { nx: 0, nz: -1 },
-        west: { nx: 1, nz: 0 },
-        east: { nx: -1, nz: 0 },
-        southwest: { nx: 0.7071, nz: 0.7071 },
-        southeast: { nx: -0.7071, nz: 0.7071 },
-        northwest: { nx: 0.7071, nz: -0.7071 },
-        northeast: { nx: -0.7071, nz: -0.7071 }
-      };
-      const nvec = roadToNorthVec[roadDir] || { nx: 0, nz: 1 };
+      const roadInfo = ROAD_DIRS.find(function (d) { return d.key === roadDir; }) || ROAD_DIRS[8];
+      const roadDirName = roadInfo.name;
+      const nvec = { nx: roadInfo.nx, nz: roadInfo.nz };
 
       if (!siteW || !siteD || !coverage || !far || !road) {
         alert('主要な項目を入力してください');
@@ -498,6 +568,13 @@
         siteW: siteW,
         relief: northRelief
       };
+      currentAdj = {
+        enabled: z.adjStart != null,
+        start: z.adjStart || 20,
+        slope: z.adjSlope || 1.25,
+        siteD: siteD,
+        siteW: siteW
+      };
 
       function heightSetback(checkH) {
         if (!heightRule) return 0;
@@ -542,6 +619,11 @@
           availD = Math.min(availD, Math.max(0, siteD - setback - 0.5 - cutD));
           availW = Math.min(availW, Math.max(1, siteW - 1.0 - cutW));
         }
+        if (z.adjStart != null) {
+          const adjExtra = Math.max(0, (checkH - z.adjStart) / z.adjSlope);
+          availD = Math.min(availD, Math.max(0, siteD - setback - 0.5 - adjExtra));
+          availW = Math.min(availW, Math.max(1, siteW - 1.0 - adjExtra * 2));
+        }
 
         let area = availW * availD;
         if (floor === 1) {
@@ -572,6 +654,9 @@
       document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2);
       document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
       document.getElementById('heightRuleText').textContent = heightRule ? heightRule.label : 'なし';
+      document.getElementById('adjRuleText').textContent = z.adjStart != null
+        ? (z.adjStart + 'm＋' + z.adjSlope + '（道路以外の3辺）')
+        : 'この用途地域では原則なし';
 
       let northLabel = 'この用途地域では原則なし';
       if (z.northStart !== null) {
@@ -594,7 +679,11 @@
       document.getElementById('floorAreas').innerHTML = html;
       document.getElementById('result').style.display = 'block';
 
-      update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorAreas.length);
+      try {
+        update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorAreas.length);
+      } catch (err) {
+        document.getElementById('canvas-container').textContent = '3D表示エラー: ' + err.message;
+      }
     }
   </script>
 </body>
