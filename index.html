@@ -79,6 +79,10 @@
     <input type="number" id="setback" step="0.1" value="0">
   </div>
   <div class="form-group">
+    <label>道路面の高低差（敷地GLから・m）</label>
+    <input type="number" id="roadLevel" step="0.1" value="0" placeholder="道路が高いとプラス、低いとマイナス">
+  </div>
+  <div class="form-group">
     <label>前面道路の方位（敷地から見て）</label>
     <div class="compass" id="compass">
       <div class="compass-face" id="compassFace"></div>
@@ -136,7 +140,7 @@
     <div id="canvas-container"></div>
     <p class="note">
       ※簡易版です。<br>
-      ・前面道路の方位は、敷地から見た道路の向きです<br>
+      ・道路斜線は道路面から立ち上げます。高低差は敷地GLとの差です<br>
       ・斜め方位の各階面積は概算です<br>
       ・北側が道路のときは、斜線の立ち上がりを道路の反対側から取ります<br>
       ・高度地区は東京などでよく使う型です。自治体により式が違います<br>
@@ -230,7 +234,7 @@
     let scene, camera, renderer, group;
     let clipPlanes = [];
     let capInfos = [];
-    let currentRoad = 6, currentSetback = 0, currentSlope = 1.25;
+    let currentRoad = 6, currentSetback = 0, currentSlope = 1.25, currentRoadLevel = 0;
     let currentNorth = { enabled: false, nx: 0, nz: 1, start: 5, slope: 1.25, siteD: 10, siteW: 10, relief: 0 };
     let currentHeight = { enabled: false, nx: 0, nz: 1, start: 5, slope: 0.6, siteD: 10, siteW: 10, relief: 0 };
     let currentAdj = { enabled: false, start: 20, slope: 1.25, siteD: 10, siteW: 10 };
@@ -344,7 +348,7 @@
       if (!group || clipPlanes.length === 0) return;
 
       const roadN = new THREE.Vector3(0, -1, currentSlope).normalize();
-      const roadP = new THREE.Vector3(0, 0, -currentRoad - currentSetback);
+      const roadP = new THREE.Vector3(0, currentRoadLevel, -currentRoad - currentSetback);
       setWorldPlane(clipPlanes[0], roadN, roadP);
 
       const northPlanes = getNorthLocals();
@@ -359,13 +363,14 @@
       });
     }
 
-    function update3D(siteW, siteD, buildingW, buildingD, setback, roadWidth, slope, fl1, floorH, floorCount) {
+    function update3D(siteW, siteD, buildingW, buildingD, setback, roadWidth, slope, fl1, floorH, floorCount, roadLevel) {
       if (!scene) init3D();
       if (group) scene.remove(group);
 
       currentRoad = roadWidth;
       currentSetback = setback;
       currentSlope = slope;
+      currentRoadLevel = roadLevel;
 
       group = new THREE.Group();
 
@@ -374,8 +379,18 @@
         new THREE.MeshStandardMaterial({ color: 0x6b7280 })
       );
       road.rotation.x = -Math.PI / 2;
-      road.position.set(0, 0.01, -roadWidth / 2);
+      road.position.set(0, currentRoadLevel + 0.01, -roadWidth / 2);
       group.add(road);
+
+      if (Math.abs(currentRoadLevel) > 0.05) {
+        const wallH = Math.abs(currentRoadLevel);
+        const wall = new THREE.Mesh(
+          new THREE.BoxGeometry(siteW + 14, wallH, 0.12),
+          new THREE.MeshStandardMaterial({ color: 0x9ca3af })
+        );
+        wall.position.set(0, currentRoadLevel / 2, 0);
+        group.add(wall);
+      }
 
       const siteGeo = new THREE.PlaneGeometry(siteW, siteD);
       const site = new THREE.Mesh(siteGeo, new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.6 }));
@@ -448,7 +463,7 @@
 
       const boxLocals = makeBoxClipLocals(bx, by, bz, buildingW / 2 + 0.02, buildingHeight / 2 + 0.02, buildingD / 2 + 0.02);
       const roadN = new THREE.Vector3(0, -1, currentSlope).normalize();
-      const roadP = new THREE.Vector3(0, 0, -currentRoad - currentSetback);
+      const roadP = new THREE.Vector3(0, currentRoadLevel, -currentRoad - currentSetback);
 
       const northPlanes = edgePlanes(currentNorth);
       const heightPlanes = edgePlanes(currentHeight);
@@ -503,6 +518,7 @@
       const far = parseFloat(document.getElementById('far').value);
       const road = parseFloat(document.getElementById('road').value);
       const setback = parseFloat(document.getElementById('setback').value) || 0;
+      const roadLevel = parseFloat(document.getElementById('roadLevel').value) || 0;
       const fl1 = parseFloat(document.getElementById('fl1').value) || 0.5;
       const floorH = parseFloat(document.getElementById('floorHeight').value) || 3.0;
       const zoningKey = document.getElementById('zoning').value;
@@ -533,7 +549,8 @@
       const maxBuildingArea = siteArea * (coverage / 100);
       const maxTotalFloor = siteArea * (far / 100);
       let frontHeightLimit = (road + setback) * slope;
-      if (absHeight !== null) frontHeightLimit = Math.min(frontHeightLimit, absHeight);
+      let frontHeightFromGL = frontHeightLimit + roadLevel;
+      if (absHeight !== null) frontHeightFromGL = Math.min(frontHeightFromGL, absHeight);
 
       let buildingW = (bldgWInput && bldgWInput > 0) ? Math.min(bldgWInput, siteW - 1.0) : (siteW - 1.0);
       if (buildingW < 1) buildingW = 1;
@@ -598,7 +615,8 @@
         const flHeight = fl1 + (floor - 1) * floorH;
         if (absHeight !== null && flHeight > absHeight) break;
 
-        const distFromOpposite = flHeight / slope;
+        const heightAboveRoad = flHeight - roadLevel;
+        const distFromOpposite = Math.max(0, heightAboveRoad) / slope;
         const cutFromRoad = distFromOpposite - road;
         let depthByRoad = (cutFromRoad <= setback) ? maxPossibleDepth : Math.max(0, siteD - cutFromRoad - 0.5);
         depthByRoad = Math.min(depthByRoad, maxPossibleDepth);
@@ -651,7 +669,7 @@
       document.getElementById('buildingArea').textContent = maxBuildingArea.toFixed(2);
       document.getElementById('totalFloorArea').textContent = maxTotalFloor.toFixed(2);
       document.getElementById('slopeRatio').textContent = slope;
-      document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2);
+      document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2) + '（道路面から）／ GLから ' + frontHeightFromGL.toFixed(2);
       document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
       document.getElementById('heightRuleText').textContent = heightRule ? heightRule.label : 'なし';
       document.getElementById('adjRuleText').textContent = z.adjStart != null
@@ -680,7 +698,7 @@
       document.getElementById('result').style.display = 'block';
 
       try {
-        update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorAreas.length);
+        update3D(siteW, siteD, buildingW, buildingD, setback, road, slope, fl1, floorH, floorAreas.length, roadLevel);
       } catch (err) {
         document.getElementById('canvas-container').textContent = '3D表示エラー: ' + err.message;
       }
