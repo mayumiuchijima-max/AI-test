@@ -3,80 +3,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>簡易ボリューム検討ツール</title>
+  <title>簡易ボリューム検討ツール（Gemini Ver.）</title>
   <style>
-    body { font-family: sans-serif; max-width: 640px; margin: 20px auto; padding: 16px; background: #f5f5f5; color: #333; }
+    body { font-family: sans-serif; max-width: 680px; margin: 20px auto; padding: 16px; background: #f5f5f5; color: #333; }
     h1 { font-size: 1.3rem; margin-bottom: 16px; }
     .form-group { margin-bottom: 12px; }
     label { display: block; font-size: 0.9rem; margin-bottom: 4px; font-weight: 500; }
     input, select { width: 100%; padding: 10px; font-size: 1rem; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
-    button.calc { width: 100%; padding: 14px; font-size: 1.05rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; }
+    button.calc { width: 100%; padding: 14px; font-size: 1.05rem; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; margin-top: 8px; font-weight: bold; }
     .board { background: white; border-radius: 12px; padding: 12px; margin: 12px 0; }
     .dim { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
     .dim input { padding: 6px; font-size: 0.85rem; }
     .dim-w { justify-content: center; margin: 4px 0; }
     .dim-w input { width: 110px; }
-    .board-mid { display: block; }
-    .site-plan { display: grid; grid-template-columns: 72px minmax(0, 1fr) 72px; grid-template-rows: auto minmax(210px, auto) auto; gap: 4px; width: 100%; }
-    .site-box { grid-column: 2; grid-row: 2; background: #dbeafe; border: 2px solid #1e40af; position: relative; min-height: 210px; }
-    .bldg-box { position: absolute; left: 8px; right: 8px; bottom: 8px; top: 8px; border: 1px dashed #1d4ed8; background: rgba(255,255,255,0.9); display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 6px; }
-    .bldg-box label, .mini, .road2 { display: block; font-size: 0.68rem; color: #1e3a8a; line-height: 1.2; }
-    .bldg-box input, .mini input, .road2 input { width: 100%; padding: 6px; font-size: 0.85rem; color: #111; box-sizing: border-box; }
-    .edge { border: 1px solid #94a3b8; background: #f8fafc; border-radius: 6px; font-size: 0.75rem; padding: 6px 4px; color: #1e3a8a; text-align: center; cursor: pointer; }
-    .edge.on { background: #4b5563; color: white; border-color: #374151; }
+    .board-mid { display: flex; gap: 8px; }
+    
+    /* 敷地グリッド構成 */
+    .site-plan { display: grid; grid-template-columns: 105px minmax(0, 1fr) 105px; grid-template-rows: auto minmax(320px, auto) auto; gap: 6px; width: 100%; margin: 0; }
+    
+    /* 敷地水色ボックスとセットバック配置 */
+    .site-box { 
+      grid-column: 2; grid-row: 2; 
+      background: #dbeafe; border: 2px solid #1e40af; 
+      position: relative; min-height: 320px; padding: 28px 24px; 
+      box-sizing: border-box; display: flex; align-items: center; justify-content: center; border-radius: 8px; 
+    }
+
+    /* 各辺の中央にセットバック入力欄を配置 */
+    .sb-input { position: absolute; background: rgba(255, 255, 255, 0.9); border: 1px solid #1e40af; border-radius: 4px; padding: 2px 4px; display: flex; flex-direction: column; align-items: center; z-index: 10; }
+    .sb-input span { font-size: 0.65rem; font-weight: bold; color: #1e3a8a; white-space: nowrap; }
+    .sb-input input { width: 45px; padding: 2px 4px; font-size: 0.75rem; text-align: center; height: 24px; border: 1px solid #93c5fd; }
+
+    .sb-top { top: 4px; left: 50%; transform: translateX(-50%); }
+    .sb-bottom { bottom: 4px; left: 50%; transform: translateX(-50%); }
+    .sb-left { left: 4px; top: 50%; transform: translateY(-50%); }
+    .sb-right { right: 4px; top: 50%; transform: translateY(-50%); }
+
+    /* 中央に凝縮配置する建物ボックス */
+    .bldg-box { 
+      width: 100%; max-width: 112px; 
+      border: 1px dashed #1d4ed8; background: rgba(255,255,255,0.95); 
+      display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 8px; 
+      box-sizing: border-box; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .bldg-box label, .mini { display: block; font-size: 0.68rem; color: #1e3a8a; line-height: 1.1; font-weight: 600; }
+    .bldg-box input, .mini input { width: 100%; padding: 4px; font-size: 0.8rem; color: #111; box-sizing: border-box; margin-top: 1px; height: 26px; }
+
+    /* 方位エッジパネル */
+    .edge { border: 1px solid #94a3b8; background: #f8fafc; border-radius: 6px; font-size: 0.75rem; padding: 6px 4px; color: #1e3a8a; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .edge.on { background: #374151; color: white; border-color: #1f2937; }
     .edge-top { grid-column: 2; grid-row: 1; }
     .edge-left { grid-column: 1; grid-row: 2; }
     .edge-right { grid-column: 3; grid-row: 2; }
-    .edge-left, .edge-right { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 120px; }
-    .edge-bottom { grid-column: 2; grid-row: 3; background: #4b5563; color: white; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; cursor: default; overflow: visible; }
+    .edge-left, .edge-right { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+    .edge-bottom { grid-column: 2; grid-row: 3; background: #4b5563; color: white; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px; cursor: default; }
     .edge-bottom .mini { color: #fff; }
-    .ename { font-weight: 700; }
-    .esub { display: block; font-size: 0.62rem; font-weight: 500; }
-    .road2-wrap { display: none; margin: 8px 0 4px; }
-    .road2-wrap.show { display: grid; grid-template-columns: 72px minmax(0, 1fr) 72px; }
-    .road2-panel { grid-column: 2; padding: 8px; background: #4b5563; color: white; border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
-    .road2-panel label { display: block; font-size: 0.68rem; font-weight: 500; color: #fff; margin: 0; text-align: center; line-height: 1.2; }
-    .road2-panel input { width: 100%; margin-top: 0; padding: 6px; font-size: 0.85rem; background: #fff; color: #111; box-sizing: border-box; }
+    .ename { font-weight: 700; display: block; font-size: 0.85rem; }
+    .esub { display: block; font-size: 0.65rem; font-weight: 500; margin-bottom: 2px; }
+
+    /* 2本目道路設定入力 */
+    .road2-inputs { display: none; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 4px; text-align: left; width: 100%; }
+    .edge.on .road2-inputs { display: block; }
+    .road2-inputs label { font-size: 0.65rem; color: #f3f4f6; margin-bottom: 2px; display: block; }
+    .road2-inputs input { width: 100%; padding: 4px; font-size: 0.8rem; background: #fff; color: #111; margin-bottom: 3px; box-sizing: border-box; border-radius: 4px; }
+
+    .req:placeholder-shown { border-color: #dc2626 !important; background: #fef2f2 !important; }
+    .req::placeholder { color: #dc2626; font-weight: 700; opacity: 1; }
+    /* 狭い画面（スマホ）では左右の枠を細くして、左離れ・右離れの入力欄が建物ボックスと重ならないようにする */
+    @media (max-width: 520px) {
+      .site-plan { grid-template-columns: 58px minmax(0, 1fr) 58px; }
+      .site-box { padding: 28px 62px; }
+      .edge-left .esub, .edge-right .esub { font-size: 0.58rem; }
+    }
     .hint { font-size: 0.68rem; color: #64748b; text-align: center; margin: 2px 0 6px; }
-    .warn { color: #b45309; font-size: 0.9rem; margin-top: 8px; }
     #result { margin-top: 24px; padding: 20px; background: white; border-radius: 10px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-    .result-item { margin-bottom: 8px; font-size: 1.05rem; }
-    .floor-list { margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 8px; font-size: 0.95rem; }
-    .note { font-size: 0.8rem; color: #666; margin-top: 16px; line-height: 1.5; }
-    #canvas-container { width: 100%; height: 360px; margin-top: 20px; background: #e8eef7; border-radius: 8px; overflow: hidden; }
-  .compass { width: 92px; height: 92px; position: relative; touch-action: none; user-select: none; }
-  .compass-face { width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #fff, #dbe7f5 70%, #c5d4ea); border: 2px solid #1e3a8a; position: relative; }
-  .north-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-  .eslot { display: none; }
-  .compass-name { position: absolute; font-size: 12px; font-weight: 700; color: #1e3a8a; transform: translate(-50%, -50%); }
-  .compass-needle { position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 34px solid #dc2626; margin-left: -6px; margin-top: -34px; transform-origin: 50% 100%; pointer-events: none; z-index: 3; }
-  .compass-needle2 { position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 52px solid #2563eb; margin-left: -6px; margin-top: -52px; transform-origin: 50% 100%; pointer-events: none; z-index: 2; display: none; }
-  .compass-dot { position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: #93c5fd; border: 1px solid #1d4ed8; z-index: 4; }
-  .compass-hub { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: #1e3a8a; z-index: 5; }
-  .compass-caption { text-align: center; font-size: 0.95rem; margin-top: 6px; }
-    .site-plan { display: grid; grid-template-columns: 72px minmax(0, 1fr) 72px; grid-template-rows: auto minmax(210px, auto) auto; gap: 4px; width: 100%; margin: 0; }
-    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 10px; }
     .tile { background: #f1f5f9; border-radius: 10px; padding: 10px 12px; }
     .tile .tl { font-size: 0.72rem; color: #64748b; }
-    .tile .tv { font-size: 1.5rem; font-weight: 700; color: #1e3a8a; line-height: 1.2; }
+    .tile .tv { font-size: 1.3rem; font-weight: 700; color: #1e3a8a; line-height: 1.2; }
     .tile .tv small { font-size: 0.8rem; font-weight: 500; margin-left: 2px; }
     .tile .ts { font-size: 0.68rem; color: #64748b; margin-top: 2px; line-height: 1.35; }
-    .verdict { font-size: 0.9rem; margin: 6px 0 10px; color: #334155; }
-    .ftable { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .ftable { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
     .ftable th { text-align: left; font-size: 0.72rem; color: #64748b; font-weight: 500; border-bottom: 1px solid #cbd5e1; padding: 4px 6px; }
     .ftable td { padding: 6px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
     .ftable td.num { text-align: right; white-space: nowrap; font-weight: 600; }
     .ftable tr.total td { border-top: 2px solid #94a3b8; border-bottom: none; font-weight: 700; }
-    .plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 14px; }
-    .plan { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px; }
-    .plan .pt { font-size: 0.78rem; font-weight: 600; margin-bottom: 4px; color: #1e3a8a; }
-    details.rules { margin-top: 16px; font-size: 0.9rem; }
+    
+    .plans { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 12px; }
+    .plan { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; }
+    .plan .pt { font-size: 0.72rem; font-weight: 600; margin-bottom: 2px; color: #1e3a8a; text-align: center; }
+    
+    details.rules { margin-top: 16px; font-size: 0.85rem; }
     details.rules summary { cursor: pointer; font-weight: 600; color: #1e3a8a; padding: 6px 0; }
-    details.rules .result-item { font-size: 0.85rem; margin-bottom: 6px; }
+    details.rules .result-item { font-size: 0.8rem; margin-bottom: 4px; }
+    .note { font-size: 0.75rem; color: #666; margin-top: 16px; line-height: 1.4; }
+    #canvas-container { width: 100%; height: 320px; margin-top: 16px; background: #e8eef7; border-radius: 8px; overflow: hidden; position: relative; }
+    .compass { width: 80px; height: 80px; position: relative; touch-action: none; user-select: none; }
+    .compass-face { width: 80px; height: 80px; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #fff, #dbe7f5 70%, #c5d4ea); border: 2px solid #1e3a8a; position: relative; }
+    .north-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .compass-name { position: absolute; font-size: 10px; font-weight: 700; color: #1e3a8a; transform: translate(-50%, -50%); }
+    .compass-needle { position: absolute; left: 50%; top: 50%; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 30px solid #dc2626; margin-left: -5px; margin-top: -30px; transform-origin: 50% 100%; pointer-events: none; z-index: 3; }
+    .compass-hub { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: #1e3a8a; z-index: 5; }
+    .compass-caption { text-align: center; font-size: 0.85rem; }
   </style>
 </head>
 <body>
-  <h1>簡易ボリューム検討ツール（試作版）</h1>
+  <h1>簡易ボリューム検討ツール</h1>
 
   <div class="form-group">
     <label>用途地域</label>
@@ -142,44 +174,90 @@
         <div class="compass-needle" id="compassNeedle"></div>
         <div class="compass-hub"></div>
       </div>
-      <div class="compass-caption">北の矢印を回す<br>手前（下）が1本目の道路：<strong id="compassLabel">南</strong><br>2本目：<strong id="road2Label">なし</strong><br><span class="esub">左右・奥の辺をタップで2本目</span></div>
+      <div class="compass-caption">
+        北の矢印を回す<br>
+        手前が1本目の道路：<strong id="compassLabel">南</strong><br>
+        2本目：<strong id="road2Label">なし</strong><br>
+        <span class="esub">各外枠をタップで2本目道路に設定</span>
+      </div>
     </div>
-    <div class="road2-wrap" id="road2Wrap"><div class="road2-panel" id="road2Panel">
-      <label id="road2Box">2本目の幅員（<span id="road2DirName">南</span>側）m
-        <input type="number" id="road2Width" step="0.1" value="0" placeholder="4" inputmode="decimal">
-      </label>
-      <label>2本目の高低差 m（道路面−GL。低いとマイナス）
-        <input type="number" id="road2Level" step="0.1" value="0" placeholder="0" inputmode="decimal">
-      </label>
-      <label>2本目側の後退 m
-        <input type="number" id="road2Setback" step="0.1" value="0" placeholder="0" inputmode="decimal">
-      </label>
-    </div></div>
+    
     <p class="hint">点線の中が建物。左右＝横幅、上下＝奥行です。</p>
-    <div class="dim dim-w"><span>敷地の左右の幅 m</span><input type="number" id="width" step="0.1" placeholder="12.5"></div>
-    <div class="dim dim-w"><span>敷地の前後の奥行 m</span><input type="number" id="depth" step="0.1" placeholder="18"></div>
+    <div class="dim dim-w"><span>敷地の左右の幅 m</span><input type="number" id="width" class="req" step="0.1" placeholder="要入力"></div>
+    <div class="dim dim-w"><span>敷地の前後の奥行 m</span><input type="number" id="depth" class="req" step="0.1" placeholder="要入力"></div>
+    
     <div class="site-plan" id="sitePlan">
-      <div class="edge edge-top" data-offset="8" id="edgeTop"><span class="ename">北</span><span class="esub">奥の辺・タップで2本目</span></div>
-      <div class="edge edge-left" data-offset="4" id="edgeLeft"><span class="ename">西</span><span class="esub">左</span></div>
+      <!-- 奥側 (Top) -->
+      <div class="edge edge-top" data-offset="8" id="edgeTop">
+        <span class="ename">北</span>
+        <span class="esub">奥側の境界</span>
+        <div class="road2-inputs">
+          <label>道路幅員m<input type="number" id="r2_width_top" class="r2-width req" step="0.1" placeholder="要入力"></label>
+          <label>高低差m<input type="number" id="r2_level_top" class="r2-level" step="0.1" value="0"></label>
+        </div>
+      </div>
+
+      <!-- 左側 (Left) -->
+      <div class="edge edge-left" data-offset="4" id="edgeLeft">
+        <span class="ename">西</span>
+        <span class="esub">左側の境界</span>
+        <div class="road2-inputs">
+          <label>道路幅員m<input type="number" id="r2_width_left" class="r2-width req" step="0.1" placeholder="要入力"></label>
+          <label>高低差m<input type="number" id="r2_level_left" class="r2-level" step="0.1" value="0"></label>
+        </div>
+      </div>
+
+      <!-- 敷地・建物ボックス領域 -->
       <div class="site-box">
+        <!-- 敷地の各辺中央にセットバック入力欄を配置 -->
+        <div class="sb-input sb-top">
+          <span>奥離れ m</span>
+          <input type="number" id="setback_top" step="0.1" value="0.5" placeholder="0.5">
+        </div>
+        <div class="sb-input sb-left">
+          <span>左離れ m</span>
+          <input type="number" id="setback_left" step="0.1" value="0.5" placeholder="0.5">
+        </div>
+        <div class="sb-input sb-right">
+          <span>右離れ m</span>
+          <input type="number" id="setback_right" step="0.1" value="0.5" placeholder="0.5">
+        </div>
+        <div class="sb-input sb-bottom">
+          <span>前離れ m</span>
+          <input type="number" id="setback" step="0.1" value="0" placeholder="0">
+        </div>
+
+        <!-- 水色中央に凝縮した建物設定 -->
         <div class="bldg-box">
-          <label>建物の左右の幅 m<input type="number" id="bldgWidth" step="0.1" placeholder="空欄で最大"></label>
-          <label>建物の前後の奥行 m<input type="number" id="bldgDepth" step="0.1" placeholder="空欄で最大"></label>
+          <label>建物左右幅 m<input type="number" id="bldgWidth" step="0.1" placeholder="空欄で最大"></label>
+          <label>建物奥行 m<input type="number" id="bldgDepth" step="0.1" placeholder="空欄で最大"></label>
           <label>1階床高さ m<input type="number" id="fl1" step="0.1" value="0.5"></label>
           <label>階高 m<input type="number" id="floorHeight" step="0.1" value="3.0"></label>
         </div>
       </div>
-      <div class="edge edge-right" data-offset="-4" id="edgeRight"><span class="ename">東</span><span class="esub">右</span></div>
+
+      <!-- 右側 (Right) -->
+      <div class="edge edge-right" data-offset="-4" id="edgeRight">
+        <span class="ename">東</span>
+        <span class="esub">右側の境界</span>
+        <div class="road2-inputs">
+          <label>道路幅員m<input type="number" id="r2_width_right" class="r2-width req" step="0.1" placeholder="要入力"></label>
+          <label>高低差m<input type="number" id="r2_level_right" class="r2-level" step="0.1" value="0"></label>
+        </div>
+      </div>
+
+      <!-- 手前 1本目道路 (Bottom) -->
       <div class="edge edge-bottom" id="edgeBottom">
-        <span id="edgeBottomName">南・1本目の道路</span>
-        <label class="mini">道路幅員 m<input type="number" id="road" step="0.1" placeholder="6"></label>
+        <span id="edgeBottomName" class="ename">南・1本目の道路</span>
+        <label class="mini">道路幅員 m<input type="number" id="road" class="req" step="0.1" placeholder="要入力"></label>
         <label class="mini">GLからの高低差 m<input type="number" id="roadLevel" step="0.1" value="0" placeholder="0"></label>
-        <label class="mini">建物の後退 m<input type="number" id="setback" step="0.1" value="0" placeholder="0"></label>
       </div>
     </div>
+
     <input type="hidden" id="roadDir" value="south">
     <input type="hidden" id="road2Side" value="none">
   </div>
+  
   <button class="calc" onclick="calculate()">計算する</button>
 
   <div id="result">
@@ -200,20 +278,10 @@
     <div id="canvas-container"></div>
     <p class="note">
       ※簡易版です。<br>
-      ・左右の2本目は角地として建ぺい率+10%（上限100%）。反対側は角地緩和にしません<br>
-      ・角地のみなしは、太い道路からその幅の2倍かつ35m以内なら、中心から10m以内でも太い幅員です。中心10mを超える範囲も太い幅員です<br>
-      ・3Dの琥珀色は、みなしで太い幅員を使った角側のボリュームです<br>
-      ・擁壁の色は、敷地に接する面だけです<br>
-      ・道路面がGLより1m以上低いときは、道路斜線で道路面を (高低差−1m)÷2 だけ高いとみなします（令135条の2）。1本目・2本目とも自動で適用します<br>
-      ・オレンジが道路境界、グレーが反対側境界（道路斜線の起点）、青が道路以外の敷地境界（隣地斜線の起点）です<br>・図は手前が1本目。手前が南なら左が西・右が東です<br>
-      ・斜め方位の各階面積は概算です<br>
-      ・北側が道路のときは、斜線の立ち上がりを道路の反対側から取ります<br>
-      ・高度地区は東京などでよく使う型です。自治体により式が違います<br>
-      ・第二種・第三種の折れ線は面積計算に反映し、3Dは手前側の勾配で近似します<br>
-      ・絶対高さを入れると、用途地域の制限と厳しい方を使います<br>
-      ・北側斜線の判定は各階の天井付近の高さで行います<br>
-      ・隣地斜線は道路以外の3辺から。低層・田園はなし、住居系は20m＋1.25、商業・工業系は31m＋2.5<br>
-      実際の確認申請用ではありません。
+      ・左右の2本目は角地として建ぺい率+10%（上限100%）。<br>
+      ・隣地斜線・北側斜線は、隣地境界から建物までの離れ（左・右・奥の入力）ぶん、境界が外側にあるものとして緩和します。辺ごとの離れで計算しています<br>
+      ・道路面がGLより1m以上低いときは、高低差緩和（令135条の2）を自動適用します。<br>
+      ・図は手前が1本目の道路です。3D空間内の赤矢印が「北」を指します。
     </p>
   </div>
 
@@ -251,14 +319,15 @@
     ].map(function (item, i) {
       const deg = i * 22.5;
       const rad = deg * Math.PI / 180;
-      return { key: item[0], name: item[1], deg: deg, nx: -Math.sin(rad), nz: -Math.cos(rad) };
+      // 図面の座標（手前が道路、左=-x、奥=+z）で見た北の向き。道路が東なら北は右（+x）
+      return { key: item[0], name: item[1], deg: deg, nx: Math.sin(rad), nz: -Math.cos(rad) };
     });
     let compassIndex = 8;
     let road2Offset = 0;
 
     function road2SideFromOffset(offset) {
-      if (offset === 4) return 'right';
-      if (offset === -4 || offset === 12) return 'left';
+      if (offset === 4) return 'left';
+      if (offset === -4 || offset === 12) return 'right';
       if (offset === 8 || offset === -8) return 'rear';
       return 'none';
     }
@@ -276,31 +345,26 @@
       });
       document.getElementById('edgeBottomName').textContent = d.name + '・1本目の道路';
       const edges = [
-        { id: 'edgeRight', offset: -4, side: '右' },
-        { id: 'edgeLeft', offset: 4, side: '左' },
-        { id: 'edgeTop', offset: 8, side: '奥' }
+        { id: 'edgeRight', offset: -4 },
+        { id: 'edgeLeft', offset: 4 },
+        { id: 'edgeTop', offset: 8 }
       ];
       edges.forEach(function (edge) {
         const dir = ROAD_DIRS[(compassIndex + edge.offset + 16) % 16];
         const btn = document.getElementById(edge.id);
         const on = road2Offset === edge.offset;
         btn.querySelector('.ename').textContent = dir.name;
-        const sub = btn.querySelector('.esub');
-        if (sub) sub.textContent = on ? '2本目' : edge.side;
         btn.classList.toggle('on', on);
       });
-      const panel = document.getElementById('road2Panel');
-      document.getElementById('road2Wrap').classList.toggle('show', !!road2Offset);
-      panel.style.display = 'flex';
+
       const side = road2SideFromOffset(road2Offset);
       document.getElementById('road2Side').value = side;
       const label2 = document.getElementById('road2Label');
       if (side === 'none') {
-        label2.textContent = 'なし（左・右・奥をタップ）';
+        label2.textContent = 'なし';
       } else {
         const d2 = ROAD_DIRS[(compassIndex + road2Offset + 16) % 16];
         label2.textContent = d2.name + '側';
-        document.getElementById('road2DirName').textContent = d2.name;
       }
     }
 
@@ -312,9 +376,9 @@
         label.className = 'compass-name';
         label.textContent = d.name;
         const rad = (d.deg - 90) * Math.PI / 180;
-        const r = 32;
-        label.style.left = (46 + Math.cos(rad) * r) + 'px';
-        label.style.top = (46 + Math.sin(rad) * r) + 'px';
+        const r = 28;
+        label.style.left = (40 + Math.cos(rad) * r) + 'px';
+        label.style.top = (40 + Math.sin(rad) * r) + 'px';
         face.appendChild(label);
       });
       const compass = document.getElementById('compass');
@@ -334,28 +398,33 @@
       compass.addEventListener('pointermove', function (ev) {
         if (ev.buttons) pick(ev);
       });
+
       document.querySelectorAll('#sitePlan .edge[data-offset]').forEach(function (btn) {
         btn.addEventListener('click', function (ev) {
-          if (ev.target.closest('input, label')) return;
+          if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'LABEL') return;
           const offset = Number(btn.dataset.offset);
           road2Offset = road2Offset === offset ? 0 : offset;
           setCompass(compassIndex);
         });
       });
+
+      document.querySelectorAll('.road2-inputs input, .sb-input input').forEach(function(inp) {
+        inp.addEventListener('click', function(e) { e.stopPropagation(); });
+        inp.addEventListener('focus', function(e) { e.stopPropagation(); });
+      });
+
       setCompass(8);
     }
     initCompass();
 
-    // 道路斜線の高低差緩和（令135条の2）：敷地GLが道路面より1m以上高いとき、
-    // 道路面は (高低差−1m)/2 だけ高い位置にあるものとみなす。level = 道路面−GL（低いとマイナス）
     function levelEff(level) {
       const drop = -level;
       return drop >= 1 ? level + (drop - 1) / 2 : level;
     }
 
     let scene, camera, renderer, group;
-    let dyn = [];            // 回転に追従させる斜線面の登録簿 {plane, n, p}
-    let animating = false;   // アニメーションループを二重に起動しないためのフラグ
+    let dyn = [];            
+    let animating = false;   
     let currentRoad = 6, currentSetback = 0, currentSlope = 1.25, currentRoadLevel = 0;
     let currentRoad2 = { enabled: false, side: 'none', width: 0, level: 0, setback: 0, siteW: 10, siteD: 10, relief: null };
     let currentNorth = { enabled: false, nx: 0, nz: 1, start: 5, slope: 1.25, siteD: 10, siteW: 10, relief: 0 };
@@ -373,6 +442,7 @@
       const D = currentRoad2.siteD;
       const rw = widthOverride || currentRoad2.width;
       const sb = currentRoad2.setback || 0;
+      // 画面向かって左が-X, 右が+X
       if (currentRoad2.side === 'left') {
         return { n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2 - rw - sb, y, D / 2) };
       }
@@ -390,13 +460,13 @@
       const D = currentAdj.siteD;
       const planes = [];
       if (!(currentRoad2.enabled && currentRoad2.side === 'rear')) {
-        planes.push({ n: new THREE.Vector3(0, -1, -s).normalize(), p: new THREE.Vector3(0, start, D) });
+        planes.push({ n: new THREE.Vector3(0, -1, -s).normalize(), p: new THREE.Vector3(0, start, D + (currentAdj.sbT || 0)) });
       }
       if (!(currentRoad2.enabled && currentRoad2.side === 'left')) {
-        planes.push({ n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2, start, D / 2) });
+        planes.push({ n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2 - (currentAdj.sbL || 0), start, D / 2) });
       }
       if (!(currentRoad2.enabled && currentRoad2.side === 'right')) {
-        planes.push({ n: new THREE.Vector3(-s, -1, 0).normalize(), p: new THREE.Vector3(W / 2, start, D / 2) });
+        planes.push({ n: new THREE.Vector3(-s, -1, 0).normalize(), p: new THREE.Vector3(W / 2 + (currentAdj.sbR || 0), start, D / 2) });
       }
       return planes;
     }
@@ -415,7 +485,7 @@
       if (nz > 0.001) {
         planes.push({
           n: new THREE.Vector3(0, -1, -s / nz).normalize(),
-          p: new THREE.Vector3(0, start, D + rz)
+          p: new THREE.Vector3(0, start, D + rz + (rule.sbT || 0))
         });
       } else if (nz < -0.001) {
         planes.push({
@@ -426,18 +496,17 @@
       if (nx > 0.001) {
         planes.push({
           n: new THREE.Vector3(-s / nx, -1, 0).normalize(),
-          p: new THREE.Vector3(W / 2 + rx, start, D / 2)
+          p: new THREE.Vector3(W / 2 + rx + (rule.sbR || 0), start, D / 2)
         });
       } else if (nx < -0.001) {
         planes.push({
           n: new THREE.Vector3(-s / nx, -1, 0).normalize(),
-          p: new THREE.Vector3(-W / 2 - rx, start, D / 2)
+          p: new THREE.Vector3(-W / 2 - rx - (rule.sbL || 0), start, D / 2)
         });
       }
       return planes;
     }
 
-    // 斜線面（ローカル座標）を登録し、THREE.Plane を返す。毎フレーム updateClipPlanes() でワールド座標に変換される
     function mkPlane(n, p) {
       const pl = new THREE.Plane();
       dyn.push({ plane: pl, n: n, p: p });
@@ -445,7 +514,8 @@
     }
 
     function setWorldPlane(plane, nLocal, pLocal) {
-      const nWorld = nLocal.clone().applyQuaternion(group.quaternion);
+      // 法線は scale（x反転）→ 回転の順で変換する
+      const nWorld = nLocal.clone().multiply(group.scale).applyQuaternion(group.quaternion);
       const pWorld = pLocal.clone().applyMatrix4(group.matrixWorld);
       plane.normal.copy(nWorld);
       plane.constant = -nWorld.dot(pWorld);
@@ -468,7 +538,6 @@
       ];
     }
 
-    // 斜線面そのものを「フタ」として描く（領域の箱と、他の斜線面で切り抜く）
     function addCap(nLocal, pLocal, color, extraClipLocals, center) {
       const clips = extraClipLocals.map(function (e) { return mkPlane(e.n, e.p); });
       const mat = new THREE.MeshStandardMaterial({
@@ -480,14 +549,13 @@
       });
       const n = nLocal.clone().normalize();
       const c = center.clone();
-      c.addScaledVector(n, -c.clone().sub(pLocal).dot(n)); // 領域の中心を斜線面に投影
+      c.addScaledVector(n, -c.clone().sub(pLocal).dot(n));
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), mat);
       mesh.position.copy(c);
       mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
       group.add(mesh);
     }
 
-    // 1つの領域（長方形の平面形 × その領域だけに効く斜線面）を描く
     function buildRegion(r) {
       const w = r.x1 - r.x0;
       const d = r.z1 - r.z0;
@@ -514,9 +582,12 @@
       container.innerHTML = '';
       scene = new THREE.Scene();
       scene.background = new THREE.Color(0xe8eef7);
+      
       camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
-      camera.position.set(50, 38, 60);
-      camera.lookAt(0, 6, 10);
+      // カメラ視点：反転を防ぐため中央やや上部から見下ろす視点に微修正
+      camera.position.set(0, 38, 55);
+      camera.lookAt(0, 5, 8);
+
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(container.clientWidth, container.clientHeight);
       renderer.localClippingEnabled = true;
@@ -527,9 +598,6 @@
       scene.add(dirLight);
     }
 
-    // ===== 共通の規制モデル（2Dの面積計算と3D表示の両方がこれを使う） =====
-
-    // 高度地区の斜線（折れ線は「勾配の異なる斜線面の低い方」で表せる）
     function heightPlaneList() {
       const out = [];
       if (!currentHeight.enabled) return out;
@@ -540,25 +608,26 @@
       return out;
     }
 
-    // 建物の平面形（敷地内の絶対座標。x=0 が敷地中央、z=0 が1本目の道路境界、zが奥）
-    function makeFootprint(siteW, siteD, bldgWInput, bldgDInput, setback) {
-      let bw = (bldgWInput > 0) ? Math.min(bldgWInput, siteW - 1.0) : (siteW - 1.0);
-      if (bw < 1) bw = 1;
-      let md = Math.max(siteD - setback - 0.5, 1);
-      if (bldgDInput > 0) md = Math.min(md, bldgDInput);
-      const fp = { x0: -bw / 2, x1: bw / 2, z0: setback, z1: setback + md };
-      const r2 = currentRoad2;
-      if (r2.enabled && r2.setback > 0) {
-        if (r2.side === 'left') fp.x0 += r2.setback;
-        else if (r2.side === 'right') fp.x1 -= r2.setback;
-        else fp.z1 -= r2.setback;
+    function makeFootprint(siteW, siteD, bldgWInput, bldgDInput, sbFront, sbTop, sbLeft, sbRight) {
+      let x0 = -siteW / 2 + sbLeft;
+      let x1 = siteW / 2 - sbRight;
+      let z0 = sbFront;
+      let z1 = siteD - sbTop;
+
+      if (bldgWInput > 0) {
+        let bw = Math.min(bldgWInput, x1 - x0);
+        x1 = x0 + bw;
       }
-      fp.x1 = Math.max(fp.x1, fp.x0 + 1);
-      fp.z1 = Math.max(fp.z1, fp.z0 + 1);
-      return fp;
+      if (bldgDInput > 0) {
+        let bd = Math.min(bldgDInput, z1 - z0);
+        z1 = z0 + bd;
+      }
+
+      x1 = Math.max(x1, x0 + 1);
+      z1 = Math.max(z1, z0 + 1);
+      return { x0: x0, x1: x1, z0: z0, z1: z1 };
     }
 
-    // 平面を長方形の領域に分け、領域ごとに効く斜線面を持たせる
     function buildEnvelope(fp, H) {
       const r2 = currentRoad2;
       const road1 = function (w, color) {
@@ -572,7 +641,6 @@
         const s = extraRoadPlane(w);
         return { n: s.n, p: s.p, color: color };
       };
-      // 全領域に共通する斜線（北側・高度・隣地）
       const common = [];
       edgePlanes(currentNorth).forEach(function (p) { common.push({ n: p.n, p: p.p, color: C_NORTH }); });
       heightPlaneList().forEach(function (p) { common.push({ n: p.n, p: p.p, color: C_HEIGHT }); });
@@ -589,12 +657,10 @@
       const BIG = 1000;
       const rel = r2.relief;
       if (r2.enabled && rel) {
-        // 2道路緩和：太い道路の境界線から 2×幅員（35m以内）が「帯」。帯の外でも、細い道路の中心から10m超は太い幅員とみなす
         const right = r2.side === 'right';
         const W = currentRoad2.siteW;
         const wide = rel.wide, band = rel.band, ten = rel.tenM;
         if (rel.narrowIsSide) {
-          // 1本目が太い道路：帯は手前（z=0）から奥へ band。10m帯は側道側の敷地境界から ten
           const t0 = right ? W / 2 - ten : -W / 2;
           const t1 = right ? W / 2 : -W / 2 + ten;
           addR(-BIG, BIG, -BIG, band, [road1(currentRoad, C_ROAD), sideP(wide, C_WIDE)], C_WIDE);
@@ -602,7 +668,6 @@
           if (right) addR(-BIG, t0, band, BIG, [road1(currentRoad, C_ROAD), sideP(wide, C_WIDE)], C_WIDE);
           else addR(t1, BIG, band, BIG, [road1(currentRoad, C_ROAD), sideP(wide, C_WIDE)], C_WIDE);
         } else {
-          // 側道が太い道路：帯は側道の敷地境界から内側へ band。10m帯は1本目の境界から ten
           const b0 = right ? W / 2 - band : -W / 2;
           const b1 = right ? W / 2 : -W / 2 + band;
           const o0 = right ? -BIG : b1;
@@ -619,10 +684,9 @@
       return regions;
     }
 
-    // 高さ h に建物の一部があるとき、斜線面 pl が許す範囲（x か z の片側の限界）
     function planeBound(pl, h) {
       const n = pl.n, p = pl.p;
-      const t = -n.y * (h - p.y);   // n.x(x-px)+n.z(z-pz) >= t
+      const t = -n.y * (h - p.y);
       if (Math.abs(n.z) > 1e-9) {
         const b = p.z + t / n.z;
         return n.z > 0 ? { axis: 'z', min: b } : { axis: 'z', max: b };
@@ -635,7 +699,6 @@
       return rs.reduce(function (s, r) { return s + (r.x1 - r.x0) * (r.z1 - r.z0); }, 0);
     }
 
-    // 隣り合って同じ幅（または奥行）で続く長方形をひとつにまとめる
     function mergeRects(list) {
       let rs = list.map(function (r) { return { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1 }; });
       const eq = function (a, b) { return Math.abs(a - b) < 0.01; };
@@ -659,7 +722,6 @@
       return rs;
     }
 
-    // 高さ h の階が使える長方形（領域ごとに全ての斜線を満たす範囲）
     function floorRects(regions, h) {
       const out = [];
       regions.forEach(function (r) {
@@ -677,7 +739,6 @@
       return mergeRects(out);
     }
 
-    // 奥側(z)を zc で切り落とす
     function clipRear(rs, zc) {
       const out = [];
       rs.forEach(function (r) {
@@ -687,7 +748,6 @@
       return out;
     }
 
-    // 面積が target 以下になるように、奥側を削る位置 zc を求める
     function fitArea(rs, zLo, zHi, target) {
       if (rectsArea(clipRear(rs, zHi)) <= target) return zHi;
       let lo = zLo, hi = zHi;
@@ -699,67 +759,107 @@
     }
 
     function fmtRects(rs) {
-      return rs.map(function (r) { return (r.x1 - r.x0).toFixed(1) + ' × ' + (r.z1 - r.z0).toFixed(1); }).join(' ＋ ');
+      return rs.map(function (r) { return (r.x1 - r.x0).toFixed(1) + '×' + (r.z1 - r.z0).toFixed(1); }).join('＋');
     }
 
-    // 各階の平面図（SVG）。手前（下）が1本目の道路
+    /* SVG平面図描画 */
     function planSvg(rs, ctx) {
       const W = ctx.siteW, D = ctx.siteD, R1 = ctx.road;
       const r2s = ctx.road2Side, r2w = ctx.road2Width;
       const m = 1.5;
+      
       const xMin = -W / 2 - (r2s === 'left' ? r2w : m);
       const xMax = W / 2 + (r2s === 'right' ? r2w : m);
       const zMin = -R1;
       const zMax = D + (r2s === 'rear' ? r2w : m);
-      const sc = 300 / (xMax - xMin);
-      const X = function (x) { return ((xMax - x) * sc).toFixed(1); };
+      
+      const sc = 200 / (xMax - xMin);
+      
+      const X = function (x) { return ((x - xMin) * sc).toFixed(1); };
       const Y = function (z) { return ((zMax - z) * sc).toFixed(1); };
       const w = (xMax - xMin) * sc, h = (zMax - zMin) * sc;
+      
       const box = function (x0, z0, x1, z1, attr) {
-        return '<rect x="' + X(x1) + '" y="' + Y(z1) + '" width="' + ((x1 - x0) * sc).toFixed(1) + '" height="' + ((z1 - z0) * sc).toFixed(1) + '" ' + attr + '/>';
+        const left = Math.min(x0, x1);
+        const top = Math.max(z0, z1);
+        return '<rect x="' + X(left) + '" y="' + Y(top) + '" width="' + (Math.abs(x1 - x0) * sc).toFixed(1) + '" height="' + (Math.abs(z1 - z0) * sc).toFixed(1) + '" ' + attr + '/>';
       };
+      
       const text = function (x, z, t, size, fill) {
         return '<text x="' + X(x) + '" y="' + Y(z) + '" font-size="' + size + '" fill="' + fill + '" text-anchor="middle" dominant-baseline="middle">' + t + '</text>';
       };
+      
       let s = '<svg viewBox="0 0 ' + w.toFixed(0) + ' ' + h.toFixed(0) + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">';
       s += box(xMin, zMin, xMax, zMax, 'fill="#f1f5f9"');
+      
+      // 1本目道路（手前/下側）
       s += box(xMin, zMin, xMax, 0, 'fill="#cbd5e1"');
-      s += text((xMin + xMax) / 2, -R1 / 2, '道路 ' + R1 + 'm', 15, '#475569');
-      if (r2s === 'left') { s += box(xMin, 0, -W / 2, D, 'fill="#cbd5e1"'); s += text(xMin + r2w / 2, D / 2, r2w + 'm', 15, '#475569'); }
-      if (r2s === 'right') { s += box(W / 2, 0, xMax, D, 'fill="#cbd5e1"'); s += text(xMax - r2w / 2, D / 2, r2w + 'm', 15, '#475569'); }
-      if (r2s === 'rear') { s += box(xMin, D, xMax, zMax, 'fill="#cbd5e1"'); s += text((xMin + xMax) / 2, D + r2w / 2, r2w + 'm', 15, '#475569'); }
-      s += box(-W / 2, 0, W / 2, D, 'fill="#dbeafe" stroke="#1e40af" stroke-width="1.5"');
-      const rel = ctx.rel;
-      if (rel) {
-        const band = rel.band;
-        if (rel.narrowIsSide) {
-          if (band < D) s += box(-W / 2, 0, W / 2, band, 'fill="rgba(251,191,36,0.28)"');
-          else s += box(-W / 2, 0, W / 2, D, 'fill="rgba(251,191,36,0.28)"');
-        } else if (r2s === 'right') {
-          s += box(Math.max(-W / 2, W / 2 - band), 0, W / 2, D, 'fill="rgba(251,191,36,0.28)"');
-        } else {
-          s += box(-W / 2, 0, Math.min(W / 2, -W / 2 + band), D, 'fill="rgba(251,191,36,0.28)"');
-        }
+      s += text((xMin + xMax) / 2, -R1 / 2, '道路 ' + R1 + 'm', 12, '#475569');
+      
+      // 2本目道路
+      if (r2s === 'left') { 
+        s += box(xMin, 0, -W / 2, D, 'fill="#cbd5e1"'); 
+        s += text(-W / 2 - r2w / 2, D / 2, r2w + 'm', 12, '#475569'); 
       }
+      if (r2s === 'right') { 
+        s += box(W / 2, 0, xMax, D, 'fill="#cbd5e1"'); 
+        s += text(W / 2 + r2w / 2, D / 2, r2w + 'm', 12, '#475569'); 
+      }
+      if (r2s === 'rear') { 
+        s += box(xMin, D, xMax, zMax, 'fill="#cbd5e1"'); 
+        s += text((xMin + xMax) / 2, D + r2w / 2, r2w + 'm', 12, '#475569'); 
+      }
+      
+      // 敷地本体
+      s += box(-W / 2, 0, W / 2, D, 'fill="#dbeafe" stroke="#1e40af" stroke-width="1.5"');
+      
+      // 建物範囲
       rs.forEach(function (r) {
         s += box(r.x0, r.z0, r.x1, r.z1, 'fill="#3b82f6" fill-opacity="0.85" stroke="#1e3a8a" stroke-width="1"');
-        if ((r.x1 - r.x0) * sc > 78 && (r.z1 - r.z0) * sc > 22) {
-          s += text((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2, (r.x1 - r.x0).toFixed(1) + '×' + (r.z1 - r.z0).toFixed(1), 15, '#fff');
+        if ((r.x1 - r.x0) * sc > 40 && (r.z1 - r.z0) * sc > 16) {
+          s += text((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2, (r.x1 - r.x0).toFixed(1) + '×' + (r.z1 - r.z0).toFixed(1), 11, '#fff');
         }
       });
-      // 北の矢印
-      const dx = -ctx.nvec.nx, dy = -ctx.nvec.nz;
-      const cx = 26, cy = 42, L = 16;
+      
+      // 方位マーク
+      const dx = ctx.nvec.nx, dy = ctx.nvec.nz;
+      const cx = xMin + 2.5, cy = D - 2.5, L = 0.8;
       const tx = cx + dx * L, ty = cy + dy * L, bx = cx - dx * L, by = cy - dy * L;
       const px = -dy, py = dx;
-      s += '<line x1="' + bx.toFixed(1) + '" y1="' + by.toFixed(1) + '" x2="' + tx.toFixed(1) + '" y2="' + ty.toFixed(1) + '" stroke="#dc2626" stroke-width="2"/>';
-      s += '<polygon points="' + tx.toFixed(1) + ',' + ty.toFixed(1) + ' ' + (tx - dx * 6 + px * 4).toFixed(1) + ',' + (ty - dy * 6 + py * 4).toFixed(1) + ' ' + (tx - dx * 6 - px * 4).toFixed(1) + ',' + (ty - dy * 6 - py * 4).toFixed(1) + '" fill="#dc2626"/>';
-      s += '<text x="' + (tx + dx * 9).toFixed(1) + '" y="' + (ty + dy * 9).toFixed(1) + '" font-size="15" font-weight="700" fill="#dc2626" text-anchor="middle" dominant-baseline="middle">北</text>';
+      
+      s += '<line x1="' + X(bx) + '" y1="' + Y(by) + '" x2="' + X(tx) + '" y2="' + Y(ty) + '" stroke="#dc2626" stroke-width="1.5"/>';
+      s += '<polygon points="' + X(tx) + ',' + Y(ty) + ' ' + X(tx - dx * 0.4 + px * 0.3) + ',' + Y(ty - dy * 0.4 + py * 0.3) + ' ' + X(tx - dx * 0.4 - px * 0.3) + ',' + Y(ty - dy * 0.4 - py * 0.3) + '" fill="#dc2626"/>';
+      s += '<text x="' + X(tx + dx * 0.5) + '" y="' + Y(ty + dy * 0.5) + '" font-size="10" font-weight="700" fill="#dc2626" text-anchor="middle" dominant-baseline="middle">北</text>';
       s += '</svg>';
       return s;
     }
 
-    function update3D(siteW, siteD, fp, setback, roadWidth, slope, fl1, floorH, floorCount, roadLevel) {
+    function create3DCompass(nvec) {
+      const compassGroup = new THREE.Group();
+      
+      const arrowGeo = new THREE.ConeGeometry(0.8, 3, 8);
+      const arrowNorth = new THREE.Mesh(arrowGeo, new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+      arrowNorth.position.z = 1.5;
+      arrowNorth.rotation.x = Math.PI / 2;
+      compassGroup.add(arrowNorth);
+
+      const arrowSouth = new THREE.Mesh(arrowGeo, new THREE.MeshStandardMaterial({ color: 0x94a3b8 }));
+      arrowSouth.position.z = -1.5;
+      arrowSouth.rotation.x = -Math.PI / 2;
+      compassGroup.add(arrowSouth);
+
+      const ringGeo = new THREE.TorusGeometry(0.5, 0.1, 8, 24);
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshStandardMaterial({ color: 0x1e3a8a }));
+      ring.rotation.x = Math.PI / 2;
+      compassGroup.add(ring);
+
+      const angle = Math.atan2(nvec.nx, nvec.nz);
+      compassGroup.rotation.y = angle;
+
+      return compassGroup;
+    }
+
+    function update3D(siteW, siteD, fp, setback, roadWidth, slope, fl1, floorH, floorCount, roadLevel, nvec) {
       if (!scene) init3D();
       if (group) scene.remove(group);
       dyn = [];
@@ -770,7 +870,10 @@
       currentRoadLevel = roadLevel;
 
       group = new THREE.Group();
+      // 図面の座標は「左=-x、奥=+z」（左手系）。three.js は右手系なので x を反転して鏡像にならないようにする
+      group.scale.set(-1, 1, 1);
 
+      // 1本目主道路（手前）
       const road = new THREE.Mesh(
         new THREE.PlaneGeometry(siteW + 14, roadWidth),
         new THREE.MeshStandardMaterial({ color: 0x6b7280 })
@@ -789,12 +892,13 @@
         group.add(wall);
       }
 
+      // 2本目道路（左右・奥の配置座標を正方向で配置）
       if (currentRoad2.enabled) {
         let rw = currentRoad2.width;
         const road2mesh = new THREE.Mesh(
           new THREE.PlaneGeometry(
-            currentRoad2.side === 'rear' ? siteW + 6 : rw,
-            currentRoad2.side === 'rear' ? rw : siteD + 6
+            currentRoad2.side === 'rear' ? siteW + 14 : rw,
+            currentRoad2.side === 'rear' ? rw : siteD + 14
           ),
           new THREE.MeshStandardMaterial({ color: 0x6b7280 })
         );
@@ -804,20 +908,6 @@
         else if (currentRoad2.side === 'right') road2mesh.position.set(siteW / 2 + rw / 2, y2, siteD / 2);
         else road2mesh.position.set(0, y2, siteD + rw / 2);
         group.add(road2mesh);
-        if (Math.abs(currentRoad2.level) > 0.05) {
-          const wall2 = new THREE.Mesh(
-            new THREE.BoxGeometry(
-              currentRoad2.side === 'rear' ? siteW : 0.18,
-              Math.abs(currentRoad2.level),
-              currentRoad2.side === 'rear' ? 0.18 : siteD
-            ),
-            new THREE.MeshStandardMaterial({ color: 0xb7a898 })
-          );
-          if (currentRoad2.side === 'left') wall2.position.set(-siteW / 2 + 0.09, currentRoad2.level / 2, siteD / 2);
-          else if (currentRoad2.side === 'right') wall2.position.set(siteW / 2 - 0.09, currentRoad2.level / 2, siteD / 2);
-          else wall2.position.set(0, currentRoad2.level / 2, siteD - 0.09);
-          group.add(wall2);
-        }
       }
 
       const siteGeo = new THREE.PlaneGeometry(siteW, siteD);
@@ -826,102 +916,13 @@
       site.position.set(0, 0.02, siteD / 2);
       group.add(site);
 
-      function boundary(points, color) {
-        const geo = new THREE.BufferGeometry().setFromPoints(points);
-        const ln = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: color }));
-        ln.position.y = 0.14;
-        group.add(ln);
-      }
-      const roadEdges = { front: true, left: false, right: false, rear: false };
-      if (currentRoad2.enabled) roadEdges[currentRoad2.side] = true;
-      if (!roadEdges.left) boundary([new THREE.Vector3(-siteW / 2, 0, 0), new THREE.Vector3(-siteW / 2, 0, siteD)], 0x1d4ed8);
-      if (!roadEdges.right) boundary([new THREE.Vector3(siteW / 2, 0, 0), new THREE.Vector3(siteW / 2, 0, siteD)], 0x1d4ed8);
-      if (!roadEdges.rear) boundary([new THREE.Vector3(-siteW / 2, 0, siteD), new THREE.Vector3(siteW / 2, 0, siteD)], 0x1d4ed8);
-      boundary([new THREE.Vector3(-siteW / 2 - 1, 0, 0), new THREE.Vector3(siteW / 2 + 1, 0, 0)], 0xf97316);
-      boundary([new THREE.Vector3(-siteW / 2 - 1, 0, -currentRoad), new THREE.Vector3(siteW / 2 + 1, 0, -currentRoad)], 0x9ca3af);
-      if (roadEdges.left) {
-        boundary([new THREE.Vector3(-siteW / 2, 0, 0), new THREE.Vector3(-siteW / 2, 0, siteD)], 0xf97316);
-        boundary([new THREE.Vector3(-siteW / 2 - currentRoad2.width, 0, 0), new THREE.Vector3(-siteW / 2 - currentRoad2.width, 0, siteD)], 0x9ca3af);
-      }
-      if (roadEdges.right) {
-        boundary([new THREE.Vector3(siteW / 2, 0, 0), new THREE.Vector3(siteW / 2, 0, siteD)], 0xf97316);
-        boundary([new THREE.Vector3(siteW / 2 + currentRoad2.width, 0, 0), new THREE.Vector3(siteW / 2 + currentRoad2.width, 0, siteD)], 0x9ca3af);
-      }
-      if (roadEdges.rear) {
-        boundary([new THREE.Vector3(-siteW / 2, 0, siteD), new THREE.Vector3(siteW / 2, 0, siteD)], 0xf97316);
-        boundary([new THREE.Vector3(-siteW / 2, 0, siteD + currentRoad2.width), new THREE.Vector3(siteW / 2, 0, siteD + currentRoad2.width)], 0x9ca3af);
-      }
+      // 3D北矢印
+      const compass3D = create3DCompass(nvec);
+      compass3D.position.set(-siteW / 2 - 5, 0.5, -currentRoad - 2);
+      group.add(compass3D);
 
-      const markCanvas = document.createElement('canvas');
-      markCanvas.width = 128;
-      markCanvas.height = 128;
-      const mctx = markCanvas.getContext('2d');
-      mctx.fillStyle = '#dc2626';
-      mctx.beginPath();
-      mctx.moveTo(64, 10);
-      mctx.lineTo(112, 112);
-      mctx.lineTo(64, 90);
-      mctx.lineTo(16, 112);
-      mctx.closePath();
-      mctx.fill();
-      mctx.fillStyle = '#ffffff';
-      mctx.font = 'bold 44px sans-serif';
-      mctx.textAlign = 'center';
-      mctx.textBaseline = 'middle';
-      mctx.fillText('北', 64, 68);
-      const markMat = new THREE.MeshBasicMaterial({
-        map: new THREE.CanvasTexture(markCanvas),
-        transparent: true,
-        side: THREE.DoubleSide
-      });
-      const northMark = new THREE.Mesh(new THREE.PlaneGeometry(3.2, 3.2), markMat);
-      northMark.rotation.order = 'YXZ';
-      const gap = 2.2;
-      const nx = currentNorth.nx;
-      const nz = currentNorth.nz;
-      const x0 = (nx > 0.001) ? siteW / 2 : (nx < -0.001 ? -siteW / 2 : 0);
-      const z0 = (nz > 0.001) ? siteD : (nz < -0.001 ? 0 : siteD / 2);
-      northMark.position.set(x0 + nx * gap, 0.06, z0 + nz * gap);
-      const rotY = Math.atan2(-nx, -nz);
-      northMark.rotation.set(-Math.PI / 2, rotY, 0);
-      group.add(northMark);
-
-      // ---- 建物ボリューム ----
       const H = fl1 + floorCount * floorH + 2.0;
-      const fx0 = fp.x0, fx1 = fp.x1, fz0 = fp.z0, fz1 = fp.z1;
-      const r2 = currentRoad2;
-      const rel = r2.relief;
       buildEnvelope(fp, H).forEach(buildRegion);
-
-      // 帯の範囲を地面に薄く表示
-      if (rel) {
-        const band = rel.band;
-        const mark = new THREE.Mesh(
-          new THREE.PlaneGeometry(
-            rel.narrowIsSide ? siteW : Math.min(band, siteW),
-            rel.narrowIsSide ? Math.min(band, siteD) : siteD
-          ),
-          new THREE.MeshBasicMaterial({ color: 0xfbbf24, transparent: true, opacity: 0.35, side: THREE.DoubleSide })
-        );
-        mark.rotation.x = -Math.PI / 2;
-        if (rel.narrowIsSide) mark.position.set(0, 0.08, Math.min(band, siteD) / 2);
-        else if (r2.side === 'right') mark.position.set(siteW / 2 - Math.min(band, siteW) / 2, 0.08, siteD / 2);
-        else mark.position.set(-siteW / 2 + Math.min(band, siteW) / 2, 0.08, siteD / 2);
-        group.add(mark);
-      }
-
-      const flMat = new THREE.LineBasicMaterial({ color: 0xf59e0b });
-      for (let i = 0; i <= floorCount; i++) {
-        const h = fl1 + i * floorH;
-        const flGeo = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(fx0 - 0.15, h, fz0),
-          new THREE.Vector3(fx1 + 0.15, h, fz0),
-          new THREE.Vector3(fx1 + 0.15, h, fz1),
-          new THREE.Vector3(fx0 - 0.15, h, fz1),
-          new THREE.Vector3(fx0 - 0.15, h, fz0)
-        ]);
-        group.add(new THREE.Line(flGeo, flMat));
-      }
 
       scene.add(group);
       updateClipPlanes();
@@ -931,7 +932,8 @@
         (function animate() {
           requestAnimationFrame(animate);
           if (group) {
-            group.rotation.y += 0.004;
+            // ゆっくり回転させるアニメーション
+            group.rotation.y += 0.003;
             updateClipPlanes();
           }
           renderer.render(scene, camera);
@@ -941,245 +943,228 @@
 
     function calculate() {
       try {
-      const gv = function (id) { return parseFloat(document.getElementById(id).value); };
-      const siteW = gv('width');
-      const siteD = gv('depth');
-      const bldgWInput = gv('bldgWidth');
-      const bldgDInput = gv('bldgDepth');
-      const coverage = gv('coverage');
-      const far = gv('far');
-      const road = gv('road');
-      const setback = gv('setback') || 0;
-      const roadLevel = gv('roadLevel') || 0;
-      const road2Side = document.getElementById('road2Side').value;
-      const road2Width = gv('road2Width') || 0;
-      const road2Level = gv('road2Level') || 0;
-      const road2Setback = gv('road2Setback') || 0;
-      const roadEff = levelEff(roadLevel);
-      const road2Eff = levelEff(road2Level);
-      const fl1 = gv('fl1') || 0.5;
-      const floorH = gv('floorHeight') || 3.0;
-      const zoningKey = document.getElementById('zoning').value;
-      const absInput = gv('absHeightInput');
-      const heightKind = document.getElementById('heightDistrict').value;
-      const heightRise = gv('heightRise');
-      const heightSlopeIn = gv('heightSlope');
-      const judgeTop = document.getElementById('judgeMode').value !== 'bottom';
-      const roadDir = document.getElementById('roadDir').value;
-      const roadInfo = ROAD_DIRS.find(function (d) { return d.key === roadDir; }) || ROAD_DIRS[8];
-      const roadDirName = roadInfo.name;
-      const nvec = { nx: roadInfo.nx, nz: roadInfo.nz };
+        const gv = function (id) { return parseFloat(document.getElementById(id).value); };
+        const siteW = gv('width');
+        const siteD = gv('depth');
+        const bldgWInput = gv('bldgWidth');
+        const bldgDInput = gv('bldgDepth');
+        const coverage = gv('coverage');
+        const far = gv('far');
+        const road = gv('road');
+        const setback = gv('setback') || 0;
+        const roadLevel = gv('roadLevel') || 0;
 
-      if (!siteW || !siteD || !road) {
-        const box = document.getElementById('result');
-        box.style.display = 'block';
-        document.getElementById('summary').innerHTML = '';
-        document.getElementById('floorPlans').innerHTML = '';
-        document.getElementById('floorAreas').innerHTML = '敷地の左右の幅・前後の奥行・1本目の道路幅員を入力してください。';
-        box.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        return;
-      }
-      let coverageUse = coverage;
-      let farUse = far;
-      if (!coverageUse || !farUse) {
-        coverageUse = coverageUse || 60;
-        farUse = farUse || 200;
+        const setbackTop = gv('setback_top') || 0;
+        const setbackLeft = gv('setback_left') || 0;
+        const setbackRight = gv('setback_right') || 0;
+
+        const road2Side = document.getElementById('road2Side').value;
+        let road2Width = 0, road2Level = 0, road2Setback = 0;
+
+        if (road2Side !== 'none') {
+          if (road2Side === 'rear') {
+            road2Width = gv('r2_width_top') || 0;
+            road2Level = gv('r2_level_top') || 0;
+            road2Setback = setbackTop;
+          } else if (road2Side === 'left') {
+            road2Width = gv('r2_width_left') || 0;
+            road2Level = gv('r2_level_left') || 0;
+            road2Setback = setbackLeft;
+          } else if (road2Side === 'right') {
+            road2Width = gv('r2_width_right') || 0;
+            road2Level = gv('r2_level_right') || 0;
+            road2Setback = setbackRight;
+          }
+        }
+
+        const fl1 = gv('fl1') || 0.5;
+        const floorH = gv('floorHeight') || 3.0;
+        const zoningKey = document.getElementById('zoning').value;
+        const absInput = gv('absHeightInput');
+        const heightKind = document.getElementById('heightDistrict').value;
+        const heightRise = gv('heightRise');
+        const heightSlopeIn = gv('heightSlope');
+        const judgeTop = document.getElementById('judgeMode').value !== 'bottom';
+        const roadDir = document.getElementById('roadDir').value;
+        const roadInfo = ROAD_DIRS.find(function (d) { return d.key === roadDir; }) || ROAD_DIRS[8];
+        const nvec = { nx: roadInfo.nx, nz: roadInfo.nz };
+
+        const need = [['width', '敷地の左右の幅'], ['depth', '敷地の前後の奥行'], ['road', '1本目の道路幅員']].filter(function (x) { return !gv(x[0]); });
+        const r2WidthId = { rear: 'r2_width_top', left: 'r2_width_left', right: 'r2_width_right' }[road2Side];
+        if (r2WidthId && !gv(r2WidthId)) need.push([r2WidthId, '2本目の道路幅員']);
+        if (need.length) {
+          const box = document.getElementById('result');
+          box.style.display = 'block';
+          document.getElementById('summary').innerHTML = '';
+          document.getElementById('floorPlans').innerHTML = '';
+          document.getElementById('floorAreas').innerHTML = '<div class="warn">未入力です：' + need.map(function (x) { return x[1]; }).join('、') + '。赤い枠の欄に入力してください。</div>';
+          const target = document.getElementById(need[0][0]);
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          target.focus({ preventScroll: true });
+          return;
+        }
+
+        let coverageUse = coverage || 60;
+        let farUse = far || 200;
         document.getElementById('coverage').value = coverageUse;
         document.getElementById('far').value = farUse;
-      }
-      const cornerLot = (road2Side === 'left' || road2Side === 'right') && road2Width > 0;
-      let coverageNote = '';
-      if (cornerLot) {
-        coverageUse = Math.min(100, coverageUse + 10);
-        coverageNote = '（角地+10%）';
-      }
 
-      const z = (zoningKey && zoningData[zoningKey])
-        ? zoningData[zoningKey]
-        : { slope: 1.25, absHeight: null, northStart: null, northSlope: null };
-
-      const slope = z.slope;
-      let absHeight = z.absHeight;
-      if (!isNaN(absInput) && absInput > 0) {
-        absHeight = absHeight !== null ? Math.min(absHeight, absInput) : absInput;
-      }
-      const siteArea = siteW * siteD;
-      const maxBuildingArea = siteArea * (coverageUse / 100);
-      const maxTotalFloor = siteArea * (farUse / 100);
-      const frontHeightLimit = (road + setback) * slope;
-      let frontHeightFromGL = frontHeightLimit + roadEff;
-      if (absHeight !== null) frontHeightFromGL = Math.min(frontHeightFromGL, absHeight);
-
-      // 北側斜線・高度斜線の道路緩和（道路が北側にあるとき、起点を道路の反対側へ）
-      const reliefZ = road * Math.max(0, -nvec.nz) + (road2Side === 'rear' ? road2Width * Math.max(0, nvec.nz) : 0);
-      const reliefX = (road2Side === 'left' ? road2Width * Math.max(0, -nvec.nx) : 0) + (road2Side === 'right' ? road2Width * Math.max(0, nvec.nx) : 0);
-      const northRelief = reliefX + reliefZ;
-
-      // ---- 規制モデルの準備（2Dも3Dもここから作る） ----
-      currentRoad = road;
-      currentSetback = setback;
-      currentSlope = slope;
-      currentRoadLevel = roadLevel;
-      const road2On = road2Side !== 'none' && road2Width > 0;
-      currentRoad2 = {
-        enabled: road2On,
-        side: road2Side,
-        width: road2Width,
-        level: road2Level,
-        setback: road2Setback,
-        siteW: siteW,
-        siteD: siteD,
-        relief: (road2On && (road2Side === 'left' || road2Side === 'right')) ? {
-          wide: Math.max(road, road2Width),
-          narrow: Math.min(road, road2Width),
-          band: Math.min(Math.max(road, road2Width) * 2, 35),
-          tenM: Math.max(0, 10 - Math.min(road, road2Width) / 2),
-          narrowIsSide: road2Width <= road
-        } : null
-      };
-      currentNorth = {
-        enabled: z.northStart !== null,
-        nx: nvec.nx, nz: nvec.nz,
-        start: z.northStart || 5,
-        slope: z.northSlope || 1.25,
-        siteD: siteD, siteW: siteW,
-        reliefX: reliefX, reliefZ: reliefZ
-      };
-
-      let heightRules = [];
-      let heightLabel = 'なし';
-      if (heightKind === 'h1') { heightRules = [{ start: 5, slope: 0.6 }]; heightLabel = '第一種 5m＋0.6'; }
-      else if (heightKind === 'h2') { heightRules = [{ start: 5, slope: 1.25 }, { start: 10.2, slope: 0.6 }]; heightLabel = '第二種 5m＋1.25（8m超は15m＋0.6）'; }
-      else if (heightKind === 'h3') { heightRules = [{ start: 10, slope: 1.25 }, { start: 15.2, slope: 0.6 }]; heightLabel = '第三種 10m＋1.25（8m超は20m＋0.6）'; }
-      else if (heightKind === 'custom' && !isNaN(heightRise) && heightSlopeIn > 0) {
-        heightRules = [{ start: heightRise, slope: heightSlopeIn }];
-        heightLabel = '手入力 ' + heightRise + 'm＋' + heightSlopeIn;
-      }
-      currentHeight = {
-        enabled: heightRules.length > 0,
-        nx: nvec.nx, nz: nvec.nz,
-        rules: heightRules,
-        siteD: siteD, siteW: siteW,
-        reliefX: reliefX, reliefZ: reliefZ
-      };
-      currentAdj = {
-        enabled: z.adjStart != null,
-        start: z.adjStart || 20,
-        slope: z.adjSlope || 1.25,
-        siteD: siteD, siteW: siteW
-      };
-
-      const fp = makeFootprint(siteW, siteD, bldgWInput, bldgDInput, setback);
-      let coverageWarn = '';
-      if (bldgWInput > 0 && bldgDInput > 0 && bldgWInput * bldgDInput > maxBuildingArea + 0.05) {
-        coverageWarn = '建物寸法 ' + (bldgWInput * bldgDInput).toFixed(1) + '㎡ は建ぺい率の上限 ' + maxBuildingArea.toFixed(1) + '㎡ を超えています。上限に合わせて奥側を削っています。';
-      }
-
-      // ---- 各階の形を求める ----
-      const regions = buildEnvelope(fp, 100);
-      const floors = [];
-      let remaining = maxTotalFloor;
-      let zcut = fp.z1;
-      for (let f = 1; f <= 15 && remaining > 1; f++) {
-        const topH = fl1 + f * floorH;
-        if (absHeight !== null && topH > absHeight + 1e-6) break;
-        const h = judgeTop ? topH : fl1 + (f - 1) * floorH;
-        let rects = floorRects(regions, h);
-        if (f === 1) {
-          zcut = fitArea(rects, fp.z0, fp.z1, maxBuildingArea);
+        const cornerLot = (road2Side === 'left' || road2Side === 'right') && road2Width > 0;
+        let coverageNote = '';
+        if (cornerLot) {
+          coverageUse = Math.min(100, coverageUse + 10);
+          coverageNote = '（角地+10%）';
         }
-        rects = clipRear(rects, zcut);
-        let a = rectsArea(rects);
-        if (a > remaining) {
-          rects = clipRear(rects, fitArea(rects, fp.z0, zcut, remaining));
-          a = rectsArea(rects);
+
+        const z = (zoningKey && zoningData[zoningKey])
+          ? zoningData[zoningKey]
+          : { slope: 1.25, absHeight: null, northStart: null, northSlope: null };
+
+        const slope = z.slope;
+        let absHeight = z.absHeight;
+        if (!isNaN(absInput) && absInput > 0) {
+          absHeight = absHeight !== null ? Math.min(absHeight, absInput) : absInput;
         }
-        if (a < 5) break;
-        floors.push({ floor: f, rects: mergeRects(rects), area: a });
-        remaining -= a;
-      }
-      const fpFinal = { x0: fp.x0, x1: fp.x1, z0: fp.z0, z1: Math.max(zcut, fp.z0 + 1) };
+        const siteArea = siteW * siteD;
+        const maxBuildingArea = siteArea * (coverageUse / 100);
+        const maxTotalFloor = siteArea * (farUse / 100);
 
-      const actualBuildingArea = floors[0] ? floors[0].area : 0;
-      const actualTotalFloor = floors.reduce(function (s, f) { return s + f.area; }, 0);
-      const simCoverage = (actualBuildingArea / siteArea) * 100;
-      const simFAR = (actualTotalFloor / siteArea) * 100;
+        const reliefZ = road * Math.max(0, -nvec.nz) + (road2Side === 'rear' ? road2Width * Math.max(0, nvec.nz) : 0);
+        const reliefX = (road2Side === 'left' ? road2Width * Math.max(0, -nvec.nx) : 0) + (road2Side === 'right' ? road2Width * Math.max(0, nvec.nx) : 0);
 
-      // ---- 表示 ----
-      const tile = function (label, value, sub) {
-        return '<div class="tile"><div class="tl">' + label + '</div><div class="tv">' + value + '</div><div class="ts">' + sub + '</div></div>';
-      };
-      document.getElementById('summary').innerHTML =
-        tile('延床面積', actualTotalFloor.toFixed(1) + '<small>㎡</small>', '上限 ' + maxTotalFloor.toFixed(1) + '㎡（容積 ' + simFAR.toFixed(0) + '% / ' + farUse + '%）') +
-        tile('建築面積', actualBuildingArea.toFixed(1) + '<small>㎡</small>', '上限 ' + maxBuildingArea.toFixed(1) + '㎡' + coverageNote + '（建ぺい ' + simCoverage.toFixed(0) + '% / ' + coverageUse + '%）') +
-        tile('階数', floors.length + '<small>階</small>', '敷地 ' + siteArea.toFixed(1) + '㎡');
+        currentRoad = road;
+        currentSetback = setback;
+        currentSlope = slope;
+        currentRoadLevel = roadLevel;
+        const road2On = road2Side !== 'none' && road2Width > 0;
+        currentRoad2 = {
+          enabled: road2On,
+          side: road2Side,
+          width: road2Width,
+          level: road2Level,
+          setback: road2Setback,
+          siteW: siteW,
+          siteD: siteD,
+          relief: (road2On && (road2Side === 'left' || road2Side === 'right')) ? {
+            wide: Math.max(road, road2Width),
+            narrow: Math.min(road, road2Width),
+            band: Math.min(Math.max(road, road2Width) * 2, 35),
+            tenM: Math.max(0, 10 - Math.min(road, road2Width) / 2),
+            narrowIsSide: road2Width <= road
+          } : null
+        };
+        currentNorth = {
+          enabled: z.northStart !== null,
+          nx: nvec.nx, nz: nvec.nz,
+          start: z.northStart || 5,
+          slope: z.northSlope || 1.25,
+          siteD: siteD, siteW: siteW,
+          reliefX: reliefX, reliefZ: reliefZ
+        };
 
-      let verdict;
-      if (floors.length === 0) verdict = '斜線・高さ制限が厳しく、使える階がありません。入力を見直してください。';
-      else if (actualTotalFloor >= maxTotalFloor - 0.5) verdict = '容積率の上限まで使えます。';
-      else verdict = '斜線・高さ制限などで容積率の上限に届きません（余り ' + (maxTotalFloor - actualTotalFloor).toFixed(1) + '㎡）。';
+        let heightRules = [];
+        let heightLabel = 'なし';
+        if (heightKind === 'h1') { heightRules = [{ start: 5, slope: 0.6 }]; heightLabel = '第一種 5m＋0.6'; }
+        else if (heightKind === 'h2') { heightRules = [{ start: 5, slope: 1.25 }, { start: 10.2, slope: 0.6 }]; heightLabel = '第二種'; }
+        else if (heightKind === 'h3') { heightRules = [{ start: 10, slope: 1.25 }, { start: 15.2, slope: 0.6 }]; heightLabel = '第三種'; }
+        else if (heightKind === 'custom' && !isNaN(heightRise) && heightSlopeIn > 0) {
+          heightRules = [{ start: heightRise, slope: heightSlopeIn }];
+          heightLabel = '手入力';
+        }
+        currentHeight = {
+          enabled: heightRules.length > 0,
+          nx: nvec.nx, nz: nvec.nz,
+          rules: heightRules,
+          siteD: siteD, siteW: siteW,
+          reliefX: reliefX, reliefZ: reliefZ
+        };
+        currentAdj = {
+          enabled: z.adjStart != null,
+          start: z.adjStart || 20,
+          slope: z.adjSlope || 1.25,
+          siteD: siteD, siteW: siteW
+        };
 
-      let html = '<div class="verdict">' + verdict + '</div>';
-      if (floors.length) {
-        html += '<table class="ftable"><thead><tr><th>階</th><th>面積</th><th>内訳（間口×奥行）</th></tr></thead><tbody>';
+        const fp = makeFootprint(siteW, siteD, bldgWInput, bldgDInput, setback, setbackTop, setbackLeft, setbackRight);
+        // 隣地境界から建物までの離れ（道路側の辺は対象外）
+        const gapL = (road2On && road2Side === 'left') ? 0 : Math.max(0, fp.x0 + siteW / 2);
+        const gapR = (road2On && road2Side === 'right') ? 0 : Math.max(0, siteW / 2 - fp.x1);
+        const gapT = (road2On && road2Side === 'rear') ? 0 : Math.max(0, siteD - fp.z1);
+        [currentAdj, currentNorth].forEach(function (o) { o.sbL = gapL; o.sbR = gapR; o.sbT = gapT; });
+        const regions = buildEnvelope(fp, 100);
+        const floors = [];
+        let remaining = maxTotalFloor;
+        let zcut = fp.z1;
+
+        for (let f = 1; f <= 15 && remaining > 1; f++) {
+          const topH = fl1 + f * floorH;
+          if (absHeight !== null && topH > absHeight + 1e-6) break;
+          const h = judgeTop ? topH : fl1 + (f - 1) * floorH;
+          let rects = floorRects(regions, h);
+          if (f === 1) {
+            zcut = fitArea(rects, fp.z0, fp.z1, maxBuildingArea);
+          }
+          rects = clipRear(rects, zcut);
+          let a = rectsArea(rects);
+          if (a > remaining) {
+            rects = clipRear(rects, fitArea(rects, fp.z0, zcut, remaining));
+            a = rectsArea(rects);
+          }
+          if (a < 5) break;
+          floors.push({ floor: f, rects: mergeRects(rects), area: a });
+          remaining -= a;
+        }
+        const fpFinal = { x0: fp.x0, x1: fp.x1, z0: fp.z0, z1: Math.max(zcut, fp.z0 + 1) };
+
+        const actualBuildingArea = floors[0] ? floors[0].area : 0;
+        const actualTotalFloor = floors.reduce(function (s, f) { return s + f.area; }, 0);
+        const simCoverage = (actualBuildingArea / siteArea) * 100;
+        const simFAR = (actualTotalFloor / siteArea) * 100;
+
+        const tile = function (label, value, sub) {
+          return '<div class="tile"><div class="tl">' + label + '</div><div class="tv">' + value + '</div><div class="ts">' + sub + '</div></div>';
+        };
+        document.getElementById('summary').innerHTML =
+          tile('延床面積', actualTotalFloor.toFixed(1) + '<small>㎡</small>', '上限 ' + maxTotalFloor.toFixed(1) + '㎡（' + simFAR.toFixed(0) + '%）') +
+          tile('建築面積', actualBuildingArea.toFixed(1) + '<small>㎡</small>', '上限 ' + maxBuildingArea.toFixed(1) + '㎡' + coverageNote) +
+          tile('階数', floors.length + '<small>階</small>', '敷地 ' + siteArea.toFixed(1) + '㎡');
+
+        let html = '';
+        if (floors.length) {
+          html += '<table class="ftable"><thead><tr><th>階</th><th>面積</th><th>内訳（間口×奥行）</th></tr></thead><tbody>';
+          floors.forEach(function (f) {
+            html += '<tr><td>' + f.floor + 'F</td><td class="num">' + f.area.toFixed(1) + '㎡</td><td>' + fmtRects(f.rects) + '</td></tr>';
+          });
+          html += '<tr class="total"><td>計</td><td class="num">' + actualTotalFloor.toFixed(1) + '㎡</td><td></td></tr></tbody></table>';
+        }
+        document.getElementById('floorAreas').innerHTML = html;
+
+        const ctx = { siteW: siteW, siteD: siteD, road: road, road2Side: road2On ? road2Side : 'none', road2Width: road2Width, nvec: nvec };
+        let plans = '';
         floors.forEach(function (f) {
-          html += '<tr><td>' + f.floor + 'F</td><td class="num">' + f.area.toFixed(1) + '㎡</td><td>' + fmtRects(f.rects) + '</td></tr>';
+          plans += '<div class="plan"><div class="pt">' + f.floor + 'F (' + f.area.toFixed(1) + '㎡)</div>' + planSvg(f.rects, ctx) + '</div>';
         });
-        html += '<tr class="total"><td>計</td><td class="num">' + actualTotalFloor.toFixed(1) + '㎡</td><td></td></tr></tbody></table>';
-      }
-      if (coverageWarn) html += '<div class="warn">' + coverageWarn + '</div>';
-      document.getElementById('floorAreas').innerHTML = html;
+        document.getElementById('floorPlans').innerHTML = plans;
 
-      const ctx = { siteW: siteW, siteD: siteD, road: road, road2Side: road2On ? road2Side : 'none', road2Width: road2Width, nvec: nvec, rel: currentRoad2.relief };
-      let plans = '';
-      floors.forEach(function (f) {
-        plans += '<div class="plan"><div class="pt">' + f.floor + 'F　' + f.area.toFixed(1) + '㎡</div>' + planSvg(f.rects, ctx) + '</div>';
-      });
-      document.getElementById('floorPlans').innerHTML = plans;
+        document.getElementById('slopeRatio').textContent = slope;
+        document.getElementById('heightLimit').textContent = ((road + setback) * slope).toFixed(2);
+        document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
+        document.getElementById('heightRuleText').textContent = heightLabel;
+        document.getElementById('adjRuleText').textContent = z.adjStart != null ? (z.adjStart + 'm＋' + z.adjSlope + '／後退緩和：左 ' + gapL.toFixed(1) + 'm・右 ' + gapR.toFixed(1) + 'm・奥 ' + gapT.toFixed(1) + 'm ぶん境界を外側とみなす') : 'なし';
+        document.getElementById('judgeText').textContent = judgeTop ? '各階の上端高さ' : '各階床高さ';
+        document.getElementById('northRuleText').textContent = z.northStart !== null ? (z.northStart + 'm + ' + z.northSlope + '（北側が隣地の辺は、離れぶん後退緩和）') : 'なし';
+        document.getElementById('road2RuleText').textContent = road2On ? (road2Side + '側 ' + road2Width + 'm') : 'なし';
 
-      // ---- 適用した規制（折りたたみ） ----
-      document.getElementById('slopeRatio').textContent = slope;
-      document.getElementById('heightLimit').textContent = frontHeightLimit.toFixed(2) + '（道路面から）／ GLから ' + frontHeightFromGL.toFixed(2) + (roadEff !== roadLevel ? '（高低差緩和：道路面を GL' + roadEff.toFixed(2) + 'm とみなす）' : '');
-      document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
-      document.getElementById('heightRuleText').textContent = heightLabel;
-      document.getElementById('adjRuleText').textContent = z.adjStart != null
-        ? (z.adjStart + 'm＋' + z.adjSlope + '（道路以外の3辺）')
-        : 'この用途地域では原則なし';
-      document.getElementById('judgeText').textContent = judgeTop ? '各階の上端の高さで判定' : '各階の床高さで判定';
-
-      let northLabel = 'この用途地域では原則なし';
-      if (z.northStart !== null) {
-        northLabel = z.northStart + 'm + ' + z.northSlope + '（道路は' + roadDirName + '）';
-        if (northRelief > 0.01) {
-          northLabel += '／北側道路緩和 ' + northRelief.toFixed(2) + 'm';
+        document.getElementById('result').style.display = 'block';
+        document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        try {
+          update3D(siteW, siteD, fpFinal, setback, road, slope, fl1, floorH, floors.length, roadLevel, nvec);
+        } catch (err) {
+          console.error(err);
         }
-      }
-      document.getElementById('northRuleText').textContent = northLabel;
-      const sideName = road2Side === 'left' ? '左側' : road2Side === 'right' ? '右側' : road2Side === 'rear' ? '奥側' : 'なし';
-      let road2Text = 'なし';
-      if (road2On) {
-        const edgeH = (road2Width + road2Setback) * slope;
-        road2Text = sideName + ' ' + road2Width + 'm／高低差 ' + road2Level + 'm' + (road2Eff !== road2Level ? '（緩和後 ' + road2Eff.toFixed(2) + 'm）' : '') + '／後退 ' + road2Setback + 'm／境界付近の限度 ' + edgeH.toFixed(1) + 'm（道路面から）';
-        if (road2Side === 'left' || road2Side === 'right') {
-          const wide = Math.max(road, road2Width);
-          const narrow = Math.min(road, road2Width);
-          road2Text += '／角地+10%。2道路緩和：太い道路から' + Math.min(wide * 2, 35).toFixed(1) + 'm以内は中心10m以内でも幅員' + wide + 'm。中心10m超も幅員' + wide + 'm。それ以外は' + narrow + 'm';
-        }
-      } else if (road2Side !== 'none') {
-        road2Text = sideName + 'を選択中。幅員が0なので斜線には使っていません';
-      }
-      document.getElementById('road2RuleText').textContent = road2Text;
-
-      document.getElementById('result').style.display = 'block';
-      document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      try {
-        update3D(siteW, siteD, fpFinal, setback, road, slope, fl1, floorH, floors.length, roadLevel);
       } catch (err) {
-        document.getElementById('canvas-container').textContent = '3D表示エラー: ' + err.message;
-      }
-      } catch (err) {
-        const box = document.getElementById('result');
-        box.style.display = 'block';
+        document.getElementById('result').style.display = 'block';
         document.getElementById('floorAreas').innerHTML = '計算エラー: ' + err.message;
       }
     }
