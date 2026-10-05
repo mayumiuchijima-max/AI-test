@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>簡易ボリューム検討ツール（Gemini Ver.）</title>
+  <title>簡易ボリューム検討ツール</title>
   <style>
     body { font-family: sans-serif; max-width: 680px; margin: 20px auto; padding: 16px; background: #f5f5f5; color: #333; }
     h1 { font-size: 1.3rem; margin-bottom: 16px; }
@@ -108,10 +108,34 @@
     .compass-caption { text-align: center; font-size: 0.85rem; }
     .deg-row { display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 0.78rem; margin: 4px 0 0; }
     .deg-row input { width: 64px; padding: 4px 6px; font-size: 0.85rem; }
+    input[type=text] { width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #cbd5e1; border-radius: 8px; box-sizing: border-box; }
+    .pdfbtn { width: 100%; padding: 10px; font-size: 0.9rem; background: #fff; color: #1e3a8a; border: 1px solid #1e3a8a; border-radius: 8px; cursor: pointer; margin-bottom: 10px; font-weight: bold; }
+    #printHeader, #printFooter, #print3d { display: none; }
+    @media print {
+      @page { size: A4; margin: 12mm 12mm 20mm; @bottom-center { content: "株式会社スカイリブ環境計画"; font-size: 9pt; color: #475569; font-family: sans-serif; } }
+      body { background: #fff; padding: 0; max-width: none; }
+      body > *:not(#printHeader):not(#printFooter):not(#result):not(script) { display: none !important; }
+      .pdfbtn, #canvas-container canvas { display: none !important; }
+      #printHeader { display: block; margin-bottom: 8px; }
+      .ph-title { font-size: 1.3rem; font-weight: bold; border-bottom: 2px solid #1e3a8a; padding-bottom: 4px; margin-bottom: 6px; color: #1e3a8a; }
+      .ph-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+      .ph-table th { width: 14%; background: #f1f5f9; text-align: left; padding: 3px 6px; border: 1px solid #cbd5e1; }
+      .ph-table td { padding: 3px 6px; border: 1px solid #cbd5e1; }
+      #printFooter { display: none; }
+      #print3d { display: block; width: 100%; }
+      #canvas-container { height: auto !important; background: none; }
+      .plan, .tile, table.ftable tr { break-inside: avoid; }
+    }
   </style>
 </head>
 <body>
   <h1>簡易ボリューム検討ツール</h1>
+
+  <div class="form-group">
+    <label>物件名 / 所在地（PDFに印字されます）</label>
+    <input type="text" id="projName" placeholder="物件名">
+    <input type="text" id="projAddr" placeholder="所在地" style="margin-top:6px">
+  </div>
 
   <div class="form-group">
     <label>用途地域</label>
@@ -307,7 +331,19 @@
   
   <button class="calc" onclick="calculate()">計算する</button>
 
+  <div id="printHeader">
+    <div class="ph-title">ボリューム検討シート</div>
+    <table class="ph-table">
+      <tr><th>物件名</th><td id="phName"></td><th>作成日</th><td id="phDate"></td></tr>
+      <tr><th>所在地</th><td id="phAddr" colspan="3"></td></tr>
+      <tr><th>用途地域</th><td id="phZone"></td><th>敷地</th><td id="phSite"></td></tr>
+      <tr><th>道路</th><td id="phRoads" colspan="3"></td></tr>
+    </table>
+  </div>
+  <div id="printFooter">株式会社スカイリブ環境計画</div>
+
   <div id="result">
+    <button type="button" class="pdfbtn" onclick="window.print()">PDFで保存・印刷（ブラウザの印刷画面で「PDFに保存」を選択）</button>
     <div class="summary" id="summary"></div>
     <div id="floorAreas"></div>
     <div class="plans" id="floorPlans"></div>
@@ -329,7 +365,7 @@
     <p class="note">
       ※簡易版です。<br>
       ・建ぺい率は「法定」の数字に、角地+10%・防火+10%（法定80%で防火地域の耐火なら100%）をツールが加えます。角地は特定行政庁の指定が必要なので、必要に応じて選択で調整してください。<br>
-      ・容積率は、最大の前面道路幅員が12m未満なら 幅員×0.4（住居系）／×0.6（その他）と法定の小さい方にしています（特定道路による緩和は未対応）。<br>
+      ・容積率は、最大の前面道路幅員が12m未満なら 幅員×0.4（住居系）／×0.6（その他）と法定の小さい方にしています（特定道路による割増は、距離を入力したときに加算）。<br>
       ・複数の道路がある場合は、令132条の緩和（最大幅員の道路から幅員の2倍かつ35m以内、他の道路の中心から10m超）を自動で適用します。<br>
       ・隣地斜線・北側斜線は、隣地境界から建物までの離れ（左・右・奥の入力）ぶん、境界が外側にあるものとして緩和します。辺ごとの離れで計算しています<br>
       ・道路斜線は、前面道路の反対側の境界から適用距離（容積率と用途地域で20〜50m）までの範囲にだけかけています。後退した場合は、後退距離ぶん外側の線から測ります<br>
@@ -355,6 +391,32 @@
       "industrial": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 },
       "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 }
     };
+
+    function preparePrint() {
+      const g = function (id) { return document.getElementById(id).value; };
+      const t = function (id, v) { document.getElementById(id).textContent = v || '―'; };
+      t('phName', g('projName')); t('phAddr', g('projAddr'));
+      t('phDate', new Date().toLocaleDateString('ja-JP'));
+      const z = document.getElementById('zoning');
+      t('phZone', z.value ? z.options[z.selectedIndex].text + '（法定 建ぺい' + g('coverage') + '%・容積' + g('far') + '%）' : '未選択');
+      t('phSite', '間口 ' + g('width') + 'm × 奥行 ' + g('depth') + 'm');
+      const front = '前面 ' + g('road') + 'm' + (parseFloat(g('park_front')) > 0 ? '＋公園等' + g('park_front') + 'm' : '');
+      const other = document.getElementById('road2RuleText').textContent;
+      t('phRoads', front + (other && other !== 'なし' ? '／' + other : ''));
+      document.querySelectorAll('details.rules').forEach(function (d) { d.open = true; });
+      try {
+        if (renderer && scene && camera) {
+          renderer.render(scene, camera);
+          let img = document.getElementById('print3d');
+          if (!img) {
+            img = document.createElement('img'); img.id = 'print3d';
+            document.getElementById('canvas-container').appendChild(img);
+          }
+          img.src = renderer.domElement.toDataURL('image/png');
+        }
+      } catch (e) { console.error(e); }
+    }
+    window.addEventListener('beforeprint', preparePrint);
 
     function applyZoning() {
       const key = document.getElementById('zoning').value;
