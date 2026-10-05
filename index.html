@@ -64,6 +64,7 @@
     /* 2本目道路設定入力 */
     .road2-inputs { display: none; margin-top: 4px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 4px; text-align: left; width: 100%; }
     .edge.on .road2-inputs { display: block; }
+    .esub-note { font-size: 0.7rem; color: #64748b; margin-top: 4px; }
     .road2-inputs label { font-size: 0.65rem; color: #f3f4f6; margin-bottom: 2px; display: block; }
     .road2-inputs input { width: 100%; padding: 4px; font-size: 0.8rem; background: #fff; color: #111; margin-bottom: 3px; box-sizing: border-box; border-radius: 4px; }
 
@@ -133,11 +134,32 @@
   </div>
 
   <div class="form-group">
-    <label>建ぺい率（%） / 容積率（%）</label>
+    <label>法定建ぺい率（%） / 法定容積率（%）</label>
     <div class="board-mid">
-      <input type="number" id="coverage" step="1" placeholder="建ぺい 60">
-      <input type="number" id="far" step="1" placeholder="容積 200">
+      <input type="number" id="coverage" step="1" placeholder="法定建ぺい 60">
+      <input type="number" id="far" step="1" placeholder="法定容積 200">
     </div>
+    <div class="esub-note">指定の数字（角地・防火の加算前）を入れてください。加算はツールが行います。</div>
+  </div>
+  <div class="form-group">
+    <label>建ぺい率の緩和（法53条）</label>
+    <select id="cornerMode">
+      <option value="auto">角地：道路が左右にあれば+10%（自動）</option>
+      <option value="off">角地：適用しない</option>
+      <option value="on">角地：適用する（+10%）</option>
+    </select>
+    <select id="fireMode" style="margin-top:6px">
+      <option value="none">防火：なし</option>
+      <option value="fire">防火地域＋耐火建築物等（+10%／法定80%なら100%）</option>
+      <option value="quasi">準防火地域＋耐火・準耐火建築物等（+10%）</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>容積率の前面道路幅員制限（法52条2項）</label>
+    <select id="farRoadMode">
+      <option value="on">適用する（道路幅員12m未満のとき）</option>
+      <option value="off">適用しない</option>
+    </select>
   </div>
   <div class="form-group">
     <label>高度地区</label>
@@ -156,6 +178,22 @@
   <div class="form-group">
     <label>高度斜線の勾配（手入力）</label>
     <input type="number" id="heightSlope" step="0.05" placeholder="例: 0.6">
+  </div>
+  <div class="form-group">
+    <label>高度斜線の2段目（任意）</label>
+    <select id="heightStage2Mode">
+      <option value="none">なし（1段のみ）</option>
+      <option value="height">高さ◯mを超える部分は2段目の勾配</option>
+      <option value="dist">境界から◯mを超える部分は2段目の勾配</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>2段目に切り替わる位置（m：高さ、または境界からの距離）</label>
+    <input type="number" id="heightStage2At" step="0.1" placeholder="例: 15">
+  </div>
+  <div class="form-group">
+    <label>2段目の勾配（1段目より緩やかに）</label>
+    <input type="number" id="heightSlope2" step="0.05" placeholder="例: 0.6">
   </div>
   <div class="form-group">
     <label>絶対高さ（任意・m）</label>
@@ -179,8 +217,8 @@
       <div class="compass-caption">
         北の矢印を回す<br>
         手前が1本目の道路：<strong id="compassLabel">南</strong><br>
-        2本目：<strong id="road2Label">なし</strong><br>
-        <span class="esub">各外枠をタップで2本目道路に設定</span>
+        他の道路：<strong id="road2Label">なし</strong><br>
+        <span class="esub">各外枠をタップで道路に設定（複数可）</span>
         <label class="deg-row">道路の方位 <input type="number" id="compassDegInput" min="0" max="360" step="1" value="180" inputmode="decimal"> °</label>
         <span class="esub">北=0 東=90 南=180 西=270（コンパスは1°刻みでドラッグ）</span>
       </div>
@@ -259,7 +297,6 @@
     </div>
 
     <input type="hidden" id="roadDeg" value="180">
-    <input type="hidden" id="road2Side" value="none">
   </div>
   
   <button class="calc" onclick="calculate()">計算する</button>
@@ -274,7 +311,9 @@
       <div class="result-item">道路斜線勾配： <strong id="slopeRatio"></strong></div>
       <div class="result-item">道路斜線の適用距離： <strong id="applyDistText"></strong></div>
       <div class="result-item">道路に面する部分の高さ： <strong id="heightLimit"></strong> m</div>
-      <div class="result-item">2本目の道路： <strong id="road2RuleText"></strong></div>
+      <div class="result-item">1本目以外の道路： <strong id="road2RuleText"></strong></div>
+      <div class="result-item">建ぺい率： <strong id="covRuleText"></strong></div>
+      <div class="result-item">容積率： <strong id="farRuleText"></strong></div>
       <div class="result-item">絶対高さ制限： <strong id="absHeight"></strong></div>
       <div class="result-item">北側斜線： <strong id="northRuleText"></strong></div>
       <div class="result-item">高度斜線： <strong id="heightRuleText"></strong></div>
@@ -283,7 +322,9 @@
     <div id="canvas-container"></div>
     <p class="note">
       ※簡易版です。<br>
-      ・左右の2本目は角地として建ぺい率+10%（上限100%）。<br>
+      ・建ぺい率は「法定」の数字に、角地+10%・防火+10%（法定80%で防火地域の耐火なら100%）をツールが加えます。角地は特定行政庁の指定が必要なので、必要に応じて選択で調整してください。<br>
+      ・容積率は、最大の前面道路幅員が12m未満なら 幅員×0.4（住居系）／×0.6（その他）と法定の小さい方にしています（特定道路による緩和は未対応）。<br>
+      ・複数の道路がある場合は、令132条の緩和（最大幅員の道路から幅員の2倍かつ35m以内、他の道路の中心から10m超）を自動で適用します。<br>
       ・隣地斜線・北側斜線は、隣地境界から建物までの離れ（左・右・奥の入力）ぶん、境界が外側にあるものとして緩和します。辺ごとの離れで計算しています<br>
       ・道路斜線は、前面道路の反対側の境界から適用距離（容積率と用途地域で20〜50m）までの範囲にだけかけています。後退した場合は、後退距離ぶん外側の線から測ります<br>
       ・道路面がGLより1m以上低いときは、高低差緩和（令135条の2）を自動適用します。<br>
@@ -335,13 +376,19 @@
       return { nx: Math.sin(rad), nz: -Math.cos(rad) };
     }
     let compassDeg = 180;   // 道路がある向き（北=0、東=90、南=180、西=270）
-    let road2Offset = 0;
+    const road2Set = new Set();   // 道路にした辺（offset: 左=4 右=-4 奥=8）
 
     function road2SideFromOffset(offset) {
       if (offset === 4) return 'left';
       if (offset === -4 || offset === 12) return 'right';
       if (offset === 8 || offset === -8) return 'rear';
       return 'none';
+    }
+
+    function activeSides() {
+      const out = [];
+      [[4, 'left'], [-4, 'right'], [8, 'rear']].forEach(function (x) { if (road2Set.has(x[0])) out.push(x[1]); });
+      return out;
     }
 
     function setCompass(deg, keepInput) {
@@ -365,19 +412,14 @@
       ];
       edges.forEach(function (edge) {
         const btn = document.getElementById(edge.id);
-        const on = road2Offset === edge.offset;
+        const on = road2Set.has(edge.offset);
         btn.querySelector('.ename').textContent = dirLabel(compassDeg + edge.offset * 22.5);
         btn.classList.toggle('on', on);
       });
 
-      const side = road2SideFromOffset(road2Offset);
-      document.getElementById('road2Side').value = side;
       const label2 = document.getElementById('road2Label');
-      if (side === 'none') {
-        label2.textContent = 'なし';
-      } else {
-        label2.textContent = dirLabel(compassDeg + road2Offset * 22.5) + '側';
-      }
+      const offs = [4, -4, 8].filter(function (o) { return road2Set.has(o); });
+      label2.textContent = offs.length ? offs.map(function (o) { return dirLabel(compassDeg + o * 22.5) + '側'; }).join('・') : 'なし';
     }
 
     function initCompass() {
@@ -429,7 +471,7 @@
         btn.addEventListener('click', function (ev) {
           if (ev.target.tagName === 'INPUT' || ev.target.tagName === 'LABEL') return;
           const offset = Number(btn.dataset.offset);
-          road2Offset = road2Offset === offset ? 0 : offset;
+          if (road2Set.has(offset)) road2Set.delete(offset); else road2Set.add(offset);
           setCompass(compassDeg);
         });
       });
@@ -466,7 +508,7 @@
     let dyn = [];            
     let animating = false;   
     let currentRoad = 6, currentSetback = 0, currentSlope = 1.25, currentRoadLevel = 0;
-    let currentRoad2 = { enabled: false, side: 'none', width: 0, level: 0, setback: 0, siteW: 10, siteD: 10, relief: null };
+    let currentRoad2 = { enabled: false, roads: [], siteW: 10, siteD: 10 };
     let currentNorth = { enabled: false, nx: 0, nz: 1, start: 5, slope: 1.25, siteD: 10, siteW: 10, relief: 0 };
     let currentHeight = { enabled: false, nx: 0, nz: 1, start: 5, slope: 0.6, siteD: 10, siteW: 10, relief: 0 };
     let currentAdj = { enabled: false, start: 20, slope: 1.25, siteD: 10, siteW: 10 };
@@ -474,22 +516,28 @@
     const C_ROAD = 0xfb923c, C_ROAD2 = 0xfdba74, C_WIDE = 0xf59e0b;
     const C_NORTH = 0x86efac, C_HEIGHT = 0xfacc15, C_ADJ = 0xc084fc, C_BLUE = 0x3b82f6;
 
-    function extraRoadPlane(widthOverride) {
-      if (!currentRoad2.enabled) return null;
+    function hasRoadSide(side) { return currentRoad2.roads.some(function (r) { return r.side === side; }); }
+    function allRoadsList() {
+      return [{ side: 'front', width: currentRoad, level: currentRoadLevel, setback: currentSetback }].concat(currentRoad2.roads);
+    }
+    // 道路斜線面（幅員 w の道路 r を基準に）。左=-X、右=+X、奥=+Z
+    function roadPlane(r, w) {
       const s = currentSlope;
-      const y = levelEff(currentRoad2.level);
-      const W = currentRoad2.siteW;
-      const D = currentRoad2.siteD;
-      const rw = widthOverride || currentRoad2.width;
-      const sb = currentRoad2.setback || 0;
-      // 画面向かって左が-X, 右が+X
-      if (currentRoad2.side === 'left') {
-        return { n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2 - rw - sb, y, D / 2) };
-      }
-      if (currentRoad2.side === 'right') {
-        return { n: new THREE.Vector3(-s, -1, 0).normalize(), p: new THREE.Vector3(W / 2 + rw + sb, y, D / 2) };
-      }
-      return { n: new THREE.Vector3(0, -1, -s).normalize(), p: new THREE.Vector3(0, y, D + rw + sb) };
+      const y = levelEff(r.level);
+      const W = currentRoad2.siteW, D = currentRoad2.siteD;
+      const g = r.setback || 0;
+      if (r.side === 'front') return { n: new THREE.Vector3(0, -1, s).normalize(), p: new THREE.Vector3(0, y, -w - g) };
+      if (r.side === 'left') return { n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2 - w - g, y, D / 2) };
+      if (r.side === 'right') return { n: new THREE.Vector3(-s, -1, 0).normalize(), p: new THREE.Vector3(W / 2 + w + g, y, D / 2) };
+      return { n: new THREE.Vector3(0, -1, -s).normalize(), p: new THREE.Vector3(0, y, D + w + g) };
+    }
+    // 敷地境界（道路側）から点 (x,z) までの水平距離
+    function distFromRoad(side, x, z) {
+      const W = currentRoad2.siteW, D = currentRoad2.siteD;
+      if (side === 'front') return z;
+      if (side === 'rear') return D - z;
+      if (side === 'left') return x + W / 2;
+      return W / 2 - x;
     }
 
     function adjPlanes() {
@@ -499,13 +547,13 @@
       const W = currentAdj.siteW;
       const D = currentAdj.siteD;
       const planes = [];
-      if (!(currentRoad2.enabled && currentRoad2.side === 'rear')) {
+      if (!hasRoadSide('rear')) {
         planes.push({ n: new THREE.Vector3(0, -1, -s).normalize(), p: new THREE.Vector3(0, start, D + (currentAdj.sbT || 0)) });
       }
-      if (!(currentRoad2.enabled && currentRoad2.side === 'left')) {
+      if (!hasRoadSide('left')) {
         planes.push({ n: new THREE.Vector3(s, -1, 0).normalize(), p: new THREE.Vector3(-W / 2 - (currentAdj.sbL || 0), start, D / 2) });
       }
-      if (!(currentRoad2.enabled && currentRoad2.side === 'right')) {
+      if (!hasRoadSide('right')) {
         planes.push({ n: new THREE.Vector3(-s, -1, 0).normalize(), p: new THREE.Vector3(W / 2 + (currentAdj.sbR || 0), start, D / 2) });
       }
       return planes;
@@ -669,62 +717,84 @@
     }
 
     function buildEnvelope(fp, H) {
-      const r2 = currentRoad2;
       // 道路斜線面が効く範囲の境目（反対側の境界から適用距離）。斜線面が高くなる向き(n.x, n.z)に測る
       const cutOf = function (n, p) {
         if (currentApplyDist == null) return null;
         if (Math.abs(n.z) > Math.abs(n.x)) return { axis: 'z', sign: n.z > 0 ? 1 : -1, ref: p.z, L: currentApplyDist };
         return { axis: 'x', sign: n.x > 0 ? 1 : -1, ref: p.x, L: currentApplyDist };
       };
-      const road1 = function (w, color) {
-        const n = new THREE.Vector3(0, -1, currentSlope).normalize();
-        const p = new THREE.Vector3(0, levelEff(currentRoadLevel), -w - currentSetback);
-        return { n: n, p: p, color: color, cut: cutOf(n, p) };
-      };
-      const sideP = function (w, color) {
-        const s = extraRoadPlane(w);
-        return { n: s.n, p: s.p, color: color, cut: cutOf(s.n, s.p) };
-      };
       const common = [];
       edgePlanes(currentNorth).forEach(function (p) { common.push({ n: p.n, p: p.p, color: C_NORTH }); });
       heightPlaneList().forEach(function (p) { common.push({ n: p.n, p: p.p, color: C_HEIGHT }); });
       adjPlanes().forEach(function (p) { common.push({ n: p.n, p: p.p, color: C_ADJ }); });
 
-      const regions = [];
-      function addR(x0_, x1_, z0_, z1_, planes, color) {
-        regions.push({
-          x0: Math.max(x0_, fp.x0), x1: Math.min(x1_, fp.x1),
-          z0: Math.max(z0_, fp.z0), z1: Math.min(z1_, fp.z1),
-          planes: planes.concat(common), color: color, H: H
+      const roads = allRoadsList();
+      const W = currentRoad2.siteW, D = currentRoad2.siteD;
+      const EPS = 1e-9;
+      let wMax = 0;
+      roads.forEach(function (r) { wMax = Math.max(wMax, r.width); });
+      const band = Math.min(wMax * 2, 35);
+      const tenOf = function (r) { return Math.max(0, 10 - r.width / 2); };
+      const multi = roads.length > 1;
+
+      // 令132条の緩和の境目を、x・z それぞれの区切り線として集める
+      const xs = [fp.x0, fp.x1], zs = [fp.z0, fp.z1];
+      const addBp = function (side, d) {
+        if (side === 'front') zs.push(d);
+        else if (side === 'rear') zs.push(D - d);
+        else if (side === 'left') xs.push(-W / 2 + d);
+        else xs.push(W / 2 - d);
+      };
+      if (multi) {
+        roads.forEach(function (r) {
+          if (r.width >= wMax - EPS) addBp(r.side, band);
+          else addBp(r.side, tenOf(r));
         });
       }
-      const BIG = 1000;
-      const rel = r2.relief;
-      if (r2.enabled && rel) {
-        const right = r2.side === 'right';
-        const W = currentRoad2.siteW;
-        const wide = rel.wide, band = rel.band, ten = rel.tenM;
-        if (rel.narrowIsSide) {
-          const t0 = right ? W / 2 - ten : -W / 2;
-          const t1 = right ? W / 2 : -W / 2 + ten;
-          addR(-BIG, BIG, -BIG, band, [road1(currentRoad, C_ROAD), sideP(wide, C_WIDE)], C_WIDE);
-          addR(t0, t1, band, BIG, [road1(currentRoad, C_ROAD), sideP(r2.width, C_ROAD2)], C_BLUE);
-          if (right) addR(-BIG, t0, band, BIG, [road1(currentRoad, C_ROAD), sideP(wide, C_WIDE)], C_WIDE);
-          else addR(t1, BIG, band, BIG, [road1(currentRoad, C_ROAD), sideP(wide, C_WIDE)], C_WIDE);
-        } else {
-          const b0 = right ? W / 2 - band : -W / 2;
-          const b1 = right ? W / 2 : -W / 2 + band;
-          const o0 = right ? -BIG : b1;
-          const o1 = right ? b0 : BIG;
-          addR(b0, b1, -BIG, BIG, [road1(wide, C_WIDE), sideP(r2.width, C_ROAD2)], C_WIDE);
-          addR(o0, o1, -BIG, ten, [road1(currentRoad, C_ROAD), sideP(r2.width, C_ROAD2)], C_BLUE);
-          addR(o0, o1, ten, BIG, [road1(wide, C_WIDE), sideP(r2.width, C_ROAD2)], C_WIDE);
+      const uniq = function (a, lo, hi) {
+        return a.filter(function (v) { return v >= lo - EPS && v <= hi + EPS; })
+          .sort(function (p, q) { return p - q; })
+          .filter(function (v, k, arr) { return k === 0 || v - arr[k - 1] > 1e-6; });
+      };
+      const X = uniq(xs, fp.x0, fp.x1), Z = uniq(zs, fp.z0, fp.z1);
+
+      // 区切りごとのセルについて、効いている斜線面（有効幅員）を調べ、同じものが隣り合うセルは1つにまとめる
+      const cells = [];
+      for (let a = 0; a + 1 < X.length; a++) {
+        cells.push([]);
+        for (let b = 0; b + 1 < Z.length; b++) {
+          const cx = (X[a] + X[a + 1]) / 2, cz = (Z[b] + Z[b + 1]) / 2;
+          const inBand = multi && roads.some(function (R) {
+            return R.width >= wMax - EPS && distFromRoad(R.side, cx, cz) <= band + EPS;
+          });
+          const effs = roads.map(function (r) {
+            return (multi && r.width < wMax - EPS && (inBand || distFromRoad(r.side, cx, cz) > tenOf(r) + EPS)) ? wMax : r.width;
+          });
+          cells[a].push({ sig: effs.join('/'), effs: effs });
         }
-      } else {
-        const planes = [road1(currentRoad, C_ROAD)];
-        if (r2.enabled) planes.push(sideP(r2.width, C_ROAD2));
-        addR(-BIG, BIG, -BIG, BIG, planes, C_BLUE);
       }
+      const blocks = [];
+      for (let b = 0; b + 1 < Z.length; b++) {
+        let a = 0;
+        while (a + 1 < X.length) {
+          let a2 = a;
+          while (a2 + 2 < X.length && cells[a2 + 1][b].sig === cells[a][b].sig) a2++;
+          const blk = { x0: X[a], x1: X[a2 + 1], z0: Z[b], z1: Z[b + 1], sig: cells[a][b].sig, effs: cells[a][b].effs };
+          const prev = blocks.find(function (q) { return q.sig === blk.sig && q.x0 === blk.x0 && q.x1 === blk.x1 && Math.abs(q.z1 - blk.z0) < 1e-9; });
+          if (prev) prev.z1 = blk.z1; else blocks.push(blk);
+          a = a2 + 1;
+        }
+      }
+      const regions = blocks.map(function (k) {
+        let anyRelief = false;
+        const planes = roads.map(function (r, i) {
+          const relief = k.effs[i] > r.width + EPS;
+          if (relief) anyRelief = true;
+          const pl = roadPlane(r, k.effs[i]);
+          return { n: pl.n, p: pl.p, color: relief ? C_WIDE : (r.side === 'front' ? C_ROAD : C_ROAD2), cut: cutOf(pl.n, pl.p) };
+        });
+        return { x0: k.x0, x1: k.x1, z0: k.z0, z1: k.z1, planes: planes.concat(common), color: anyRelief ? C_WIDE : C_BLUE, H: H };
+      });
       return splitByCuts(regions);
     }
 
@@ -838,13 +908,14 @@
     /* SVG平面図描画 */
     function planSvg(rs, ctx) {
       const W = ctx.siteW, D = ctx.siteD, R1 = ctx.road;
-      const r2s = ctx.road2Side, r2w = ctx.road2Width;
+      const ex = {};
+      (ctx.extras || []).forEach(function (e) { ex[e.side] = e.width; });
       const m = 1.5;
       
-      const xMin = -W / 2 - (r2s === 'left' ? r2w : m);
-      const xMax = W / 2 + (r2s === 'right' ? r2w : m);
+      const xMin = -W / 2 - (ex.left || m);
+      const xMax = W / 2 + (ex.right || m);
       const zMin = -R1;
-      const zMax = D + (r2s === 'rear' ? r2w : m);
+      const zMax = D + (ex.rear || m);
       
       const sc = 200 / (xMax - xMin);
       
@@ -870,17 +941,17 @@
       s += text((xMin + xMax) / 2, -R1 / 2, '道路 ' + R1 + 'm', 12, '#475569');
       
       // 2本目道路
-      if (r2s === 'left') { 
+      if (ex.left) { 
         s += box(xMin, 0, -W / 2, D, 'fill="#cbd5e1"'); 
-        s += text(-W / 2 - r2w / 2, D / 2, r2w + 'm', 12, '#475569'); 
+        s += text(-W / 2 - ex.left / 2, D / 2, ex.left + 'm', 12, '#475569'); 
       }
-      if (r2s === 'right') { 
+      if (ex.right) { 
         s += box(W / 2, 0, xMax, D, 'fill="#cbd5e1"'); 
-        s += text(W / 2 + r2w / 2, D / 2, r2w + 'm', 12, '#475569'); 
+        s += text(W / 2 + ex.right / 2, D / 2, ex.right + 'm', 12, '#475569'); 
       }
-      if (r2s === 'rear') { 
+      if (ex.rear) { 
         s += box(xMin, D, xMax, zMax, 'fill="#cbd5e1"'); 
-        s += text((xMin + xMax) / 2, D + r2w / 2, r2w + 'm', 12, '#475569'); 
+        s += text((xMin + xMax) / 2, D + ex.rear / 2, ex.rear + 'm', 12, '#475569'); 
       }
       
       // 敷地本体
@@ -965,23 +1036,23 @@
         group.add(wall);
       }
 
-      // 2本目道路（左右・奥の配置座標を正方向で配置）
-      if (currentRoad2.enabled) {
-        let rw = currentRoad2.width;
+      // 2本目以降の道路（左右・奥）
+      currentRoad2.roads.forEach(function (r) {
+        const rw = r.width;
         const road2mesh = new THREE.Mesh(
           new THREE.PlaneGeometry(
-            currentRoad2.side === 'rear' ? siteW + 14 : rw,
-            currentRoad2.side === 'rear' ? rw : siteD + 14
+            r.side === 'rear' ? siteW + 14 : rw,
+            r.side === 'rear' ? rw : siteD + 14
           ),
           new THREE.MeshStandardMaterial({ color: 0x6b7280 })
         );
         road2mesh.rotation.x = -Math.PI / 2;
-        const y2 = currentRoad2.level + 0.01;
-        if (currentRoad2.side === 'left') road2mesh.position.set(-siteW / 2 - rw / 2, y2, siteD / 2);
-        else if (currentRoad2.side === 'right') road2mesh.position.set(siteW / 2 + rw / 2, y2, siteD / 2);
+        const y2 = r.level + 0.01;
+        if (r.side === 'left') road2mesh.position.set(-siteW / 2 - rw / 2, y2, siteD / 2);
+        else if (r.side === 'right') road2mesh.position.set(siteW / 2 + rw / 2, y2, siteD / 2);
         else road2mesh.position.set(0, y2, siteD + rw / 2);
         group.add(road2mesh);
-      }
+      });
 
       const siteGeo = new THREE.PlaneGeometry(siteW, siteD);
       const site = new THREE.Mesh(siteGeo, new THREE.MeshStandardMaterial({ color: 0x93c5fd, transparent: true, opacity: 0.6 }));
@@ -1031,24 +1102,21 @@
         const setbackLeft = gv('setback_left') || 0;
         const setbackRight = gv('setback_right') || 0;
 
-        const road2Side = document.getElementById('road2Side').value;
-        let road2Width = 0, road2Level = 0, road2Setback = 0;
-
-        if (road2Side !== 'none') {
-          if (road2Side === 'rear') {
-            road2Width = gv('r2_width_top') || 0;
-            road2Level = gv('r2_level_top') || 0;
-            road2Setback = setbackTop;
-          } else if (road2Side === 'left') {
-            road2Width = gv('r2_width_left') || 0;
-            road2Level = gv('r2_level_left') || 0;
-            road2Setback = setbackLeft;
-          } else if (road2Side === 'right') {
-            road2Width = gv('r2_width_right') || 0;
-            road2Level = gv('r2_level_right') || 0;
-            road2Setback = setbackRight;
-          }
-        }
+        const sideInfo = {
+          rear: { wid: 'r2_width_top', lid: 'r2_level_top', sb: setbackTop, off: 8 },
+          left: { wid: 'r2_width_left', lid: 'r2_level_left', sb: setbackLeft, off: 4 },
+          right: { wid: 'r2_width_right', lid: 'r2_level_right', sb: setbackRight, off: -4 }
+        };
+        const extras = activeSides().map(function (side) {
+          const si = sideInfo[side];
+          return { side: side, width: gv(si.wid) || 0, level: gv(si.lid) || 0, setback: si.sb };
+        });
+        const wOf = function (side) {
+          const e = extras.find(function (q) { return q.side === side; });
+          return e ? e.width : 0;
+        };
+        const roadDegForName = parseFloat(document.getElementById('roadDeg').value);
+        const sideName = function (side) { return dirLabel((isFinite(roadDegForName) ? roadDegForName : 180) + sideInfo[side].off * 22.5) + '側'; };
 
         const fl1 = gv('fl1') || 0.5;
         const floorH = gv('floorHeight') || 3.0;
@@ -1057,35 +1125,71 @@
         const heightKind = document.getElementById('heightDistrict').value;
         const heightRise = gv('heightRise');
         const heightSlopeIn = gv('heightSlope');
+        const stage2Mode = document.getElementById('heightStage2Mode').value;
+        const stage2At = gv('heightStage2At');
+        const slope2In = gv('heightSlope2');
         const judgeTop = document.getElementById('judgeMode').value !== 'bottom';
         const roadDegVal = parseFloat(document.getElementById('roadDeg').value);
         const nvec = northVec(isFinite(roadDegVal) ? roadDegVal : 180);
 
-        const need = [['width', '敷地の左右の幅'], ['depth', '敷地の前後の奥行'], ['road', '1本目の道路幅員']].filter(function (x) { return !gv(x[0]); });
-        const r2WidthId = { rear: 'r2_width_top', left: 'r2_width_left', right: 'r2_width_right' }[road2Side];
-        if (r2WidthId && !gv(r2WidthId)) need.push([r2WidthId, '2本目の道路幅員']);
+        const need = [['width', '敷地の左右の幅'], ['depth', '敷地の前後の奥行'], ['road', '1本目（手前）の道路幅員']].filter(function (x) { return !gv(x[0]); });
+        extras.forEach(function (e) {
+          if (!e.width) need.push([sideInfo[e.side].wid, sideName(e.side) + 'の道路幅員']);
+        });
+        if (document.getElementById('heightDistrict').value === 'custom') {
+          if (isNaN(gv('heightRise'))) need.push(['heightRise', '高度斜線の立ち上がり']);
+          if (!(gv('heightSlope') > 0)) need.push(['heightSlope', '高度斜線の勾配']);
+        }
         if (need.length) {
           const box = document.getElementById('result');
           box.style.display = 'block';
           document.getElementById('summary').innerHTML = '';
           document.getElementById('floorPlans').innerHTML = '';
-          document.getElementById('floorAreas').innerHTML = '<div class="warn">未入力です：' + need.map(function (x) { return x[1]; }).join('、') + '。赤い枠の欄に入力してください。</div>';
+          document.getElementById('floorAreas').innerHTML = '<div class="warn">未入力です：' + need.map(function (x) { return x[1]; }).join('、') + '。該当の欄に入力してください。</div>';
           const target = document.getElementById(need[0][0]);
           target.scrollIntoView({ behavior: 'smooth', block: 'center' });
           target.focus({ preventScroll: true });
           return;
         }
 
-        let coverageUse = coverage || 60;
-        let farUse = far || 200;
-        document.getElementById('coverage').value = coverageUse;
-        document.getElementById('far').value = farUse;
+        const covLegal = coverage || 60;
+        const farLegal = far || 200;
+        document.getElementById('coverage').value = covLegal;
+        document.getElementById('far').value = farLegal;
 
-        const cornerLot = (road2Side === 'left' || road2Side === 'right') && road2Width > 0;
+        // 建ぺい率：法定 + 角地 + 防火（法53条）
+        const cornerMode = document.getElementById('cornerMode').value;
+        const fireMode = document.getElementById('fireMode').value;
+        const cornerLot = cornerMode === 'on' || (cornerMode === 'auto' && extras.some(function (e) { return e.side === 'left' || e.side === 'right'; }));
+        let coverageUse = covLegal;
         let coverageNote = '';
-        if (cornerLot) {
-          coverageUse = Math.min(100, coverageUse + 10);
-          coverageNote = '（角地+10%）';
+        const covParts = ['法定' + covLegal + '%'];
+        if (fireMode === 'fire' && covLegal === 80) {
+          coverageUse = 100;
+          covParts.push('防火地域の耐火建築物等で制限なし');
+        } else {
+          if (cornerLot) { coverageUse += 10; covParts.push('角地10%'); }
+          if (fireMode === 'fire') { coverageUse += 10; covParts.push('耐火10%'); }
+          else if (fireMode === 'quasi') { coverageUse += 10; covParts.push('耐火・準耐火10%'); }
+        }
+        if (coverageUse > 100) { coverageUse = 100; covParts.push('上限100%'); }
+        const covText = covParts.length > 1 ? covParts.join('＋') + '＝' + coverageUse + '%' : '法定' + covLegal + '%';
+        if (covParts.length > 1) coverageNote = '（' + covText + '）';
+
+        // 容積率：法定と、前面道路幅員による制限（法52条2項）の小さい方
+        const maxRoadW = Math.max.apply(null, [road].concat(extras.map(function (e) { return e.width; })));
+        let farUse = farLegal;
+        let farNote = '';
+        let farText = '法定' + farLegal + '%';
+        if (document.getElementById('farRoadMode').value === 'on' && zoningKey && maxRoadW < 12) {
+          const resType = ['1low', '2low', 'rural', '1mid', '2mid', '1res', '2res', 'quasi'].indexOf(zoningKey) >= 0;
+          const k = resType ? 0.4 : 0.6;
+          const lim = Math.round(maxRoadW * k * 1000) / 10;
+          farText = '法定' + farLegal + '% ／ 道路幅員 ' + maxRoadW + 'm×' + k + '＝' + lim + '%';
+          if (lim < farLegal) { farUse = lim; farNote = '（道路幅員で' + lim + '%に制限）'; farText += ' → ' + lim + '%を採用'; }
+          else farText += ' → 法定の方が小さいので法定を採用';
+        } else if (document.getElementById('farRoadMode').value === 'on' && !zoningKey && maxRoadW < 12) {
+          farText = '法定' + farLegal + '%（用途地域が未選択のため道路幅員制限は未適用）';
         }
 
         const z = (zoningKey && zoningData[zoningKey])
@@ -1101,31 +1205,15 @@
         const maxBuildingArea = siteArea * (coverageUse / 100);
         const maxTotalFloor = siteArea * (farUse / 100);
 
-        const reliefZ = (nvec.nz < -0.001 ? road : 0) + (road2Side === 'rear' && nvec.nz > 0.001 ? road2Width : 0);
-        const reliefX = (road2Side === 'left' && nvec.nx < -0.001 ? road2Width : 0) + (road2Side === 'right' && nvec.nx > 0.001 ? road2Width : 0);
+        const reliefZ = (nvec.nz < -0.001 ? road : 0) + (nvec.nz > 0.001 ? wOf('rear') : 0);
+        const reliefX = (nvec.nx < -0.001 ? wOf('left') : 0) + (nvec.nx > 0.001 ? wOf('right') : 0);
 
         currentRoad = road;
         currentSetback = setback;
         currentSlope = slope;
         currentRoadLevel = roadLevel;
-        currentApplyDist = applyDistance(zoningKey, farUse);
-        const road2On = road2Side !== 'none' && road2Width > 0;
-        currentRoad2 = {
-          enabled: road2On,
-          side: road2Side,
-          width: road2Width,
-          level: road2Level,
-          setback: road2Setback,
-          siteW: siteW,
-          siteD: siteD,
-          relief: (road2On && (road2Side === 'left' || road2Side === 'right')) ? {
-            wide: Math.max(road, road2Width),
-            narrow: Math.min(road, road2Width),
-            band: Math.min(Math.max(road, road2Width) * 2, 35),
-            tenM: Math.max(0, 10 - Math.min(road, road2Width) / 2),
-            narrowIsSide: road2Width <= road
-          } : null
-        };
+        currentApplyDist = applyDistance(zoningKey, farLegal);
+        currentRoad2 = { enabled: extras.length > 0, roads: extras, siteW: siteW, siteD: siteD };
         currentNorth = {
           enabled: z.northStart !== null,
           nx: nvec.nx, nz: nvec.nz,
@@ -1136,13 +1224,29 @@
         };
 
         let heightRules = [];
+        let heightWarn = '';
         let heightLabel = 'なし';
         if (heightKind === 'h1') { heightRules = [{ start: 5, slope: 0.6 }]; heightLabel = '第一種 5m＋0.6'; }
         else if (heightKind === 'h2') { heightRules = [{ start: 5, slope: 1.25 }, { start: 10.2, slope: 0.6 }]; heightLabel = '第二種'; }
         else if (heightKind === 'h3') { heightRules = [{ start: 10, slope: 1.25 }, { start: 15.2, slope: 0.6 }]; heightLabel = '第三種'; }
         else if (heightKind === 'custom' && !isNaN(heightRise) && heightSlopeIn > 0) {
           heightRules = [{ start: heightRise, slope: heightSlopeIn }];
-          heightLabel = '手入力';
+          heightLabel = '手入力 ' + heightRise + 'm＋' + heightSlopeIn;
+          if (stage2Mode !== 'none') {
+            // 2段目：切替位置（高さ or 境界からの距離）で1段目とつながる斜線面を作る
+            const dBreak = stage2Mode === 'height' ? (stage2At - heightRise) / heightSlopeIn : stage2At;
+            const hBreak = heightRise + heightSlopeIn * dBreak;
+            if (!(stage2At > 0) || !(slope2In > 0)) {
+              heightWarn = '高度斜線の2段目は、切り替わる位置と勾配の両方が必要です。2段目は使わずに計算しています。';
+            } else if (!(dBreak > 0)) {
+              heightWarn = '切り替わる位置が1段目の立ち上がりより低い（または境界上）ため、2段目は使わずに計算しています。';
+            } else if (slope2In >= heightSlopeIn) {
+              heightWarn = '2段目の勾配は1段目より緩やかな場合だけ対応しています。2段目は使わずに計算しています。';
+            } else {
+              heightRules.push({ start: hBreak - slope2In * dBreak, slope: slope2In });
+              heightLabel += '／' + (stage2Mode === 'height' ? '高さ' + stage2At + 'm超' : '境界から' + stage2At + 'm超') + 'は勾配' + slope2In + '（高さ' + hBreak.toFixed(1) + 'm・境界から' + dBreak.toFixed(1) + 'mで切替）';
+            }
+          }
         }
         currentHeight = {
           enabled: heightRules.length > 0,
@@ -1160,9 +1264,9 @@
 
         const fp = makeFootprint(siteW, siteD, bldgWInput, bldgDInput, setback, setbackTop, setbackLeft, setbackRight);
         // 隣地境界から建物までの離れ（道路側の辺は対象外）
-        const gapL = (road2On && road2Side === 'left') ? 0 : Math.max(0, fp.x0 + siteW / 2);
-        const gapR = (road2On && road2Side === 'right') ? 0 : Math.max(0, siteW / 2 - fp.x1);
-        const gapT = (road2On && road2Side === 'rear') ? 0 : Math.max(0, siteD - fp.z1);
+        const gapL = wOf('left') ? 0 : Math.max(0, fp.x0 + siteW / 2);
+        const gapR = wOf('right') ? 0 : Math.max(0, siteW / 2 - fp.x1);
+        const gapT = wOf('rear') ? 0 : Math.max(0, siteD - fp.z1);
         [currentAdj, currentNorth].forEach(function (o) { o.sbL = gapL; o.sbR = gapR; o.sbT = gapT; });
         const regions = buildEnvelope(fp, 100);
         const floors = [];
@@ -1198,7 +1302,7 @@
           return '<div class="tile"><div class="tl">' + label + '</div><div class="tv">' + value + '</div><div class="ts">' + sub + '</div></div>';
         };
         document.getElementById('summary').innerHTML =
-          tile('延床面積', actualTotalFloor.toFixed(1) + '<small>㎡</small>', '上限 ' + maxTotalFloor.toFixed(1) + '㎡（' + simFAR.toFixed(0) + '%）') +
+          tile('延床面積', actualTotalFloor.toFixed(1) + '<small>㎡</small>', '上限 ' + maxTotalFloor.toFixed(1) + '㎡（' + simFAR.toFixed(0) + '%）' + farNote) +
           tile('建築面積', actualBuildingArea.toFixed(1) + '<small>㎡</small>', '上限 ' + maxBuildingArea.toFixed(1) + '㎡' + coverageNote) +
           tile('階数', floors.length + '<small>階</small>', '敷地 ' + siteArea.toFixed(1) + '㎡');
 
@@ -1210,9 +1314,10 @@
           });
           html += '<tr class="total"><td>計</td><td class="num">' + actualTotalFloor.toFixed(1) + '㎡</td><td></td></tr></tbody></table>';
         }
+        if (heightWarn) html += '<div class="warn">' + heightWarn + '</div>';
         document.getElementById('floorAreas').innerHTML = html;
 
-        const ctx = { siteW: siteW, siteD: siteD, road: road, road2Side: road2On ? road2Side : 'none', road2Width: road2Width, nvec: nvec };
+        const ctx = { siteW: siteW, siteD: siteD, road: road, extras: extras, nvec: nvec };
         let plans = '';
         floors.forEach(function (f) {
           plans += '<div class="plan"><div class="pt">' + f.floor + 'F (' + f.area.toFixed(1) + '㎡)</div>' + planSvg(f.rects, ctx) + '</div>';
@@ -1220,14 +1325,16 @@
         document.getElementById('floorPlans').innerHTML = plans;
 
         document.getElementById('slopeRatio').textContent = slope;
-        document.getElementById('applyDistText').textContent = currentApplyDist != null ? (currentApplyDist + 'm（前面道路の反対側の境界から。容積率 ' + farUse + '%）') : '用途地域が未選択のため、距離の制限なし';
+        document.getElementById('applyDistText').textContent = currentApplyDist != null ? (currentApplyDist + 'm（前面道路の反対側の境界から。法定容積率 ' + farLegal + '%）') : '用途地域が未選択のため、距離の制限なし';
         document.getElementById('heightLimit').textContent = ((road + setback) * slope).toFixed(2);
         document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
         document.getElementById('heightRuleText').textContent = heightLabel;
         document.getElementById('adjRuleText').textContent = z.adjStart != null ? (z.adjStart + 'm＋' + z.adjSlope + '／後退緩和：左 ' + gapL.toFixed(1) + 'm・右 ' + gapR.toFixed(1) + 'm・奥 ' + gapT.toFixed(1) + 'm ぶん境界を外側とみなす') : 'なし';
         document.getElementById('judgeText').textContent = judgeTop ? '各階の上端高さ' : '各階床高さ';
         document.getElementById('northRuleText').textContent = z.northStart !== null ? (z.northStart + 'm + ' + z.northSlope + '（北側が隣地の辺は、離れぶん後退緩和）') : 'なし';
-        document.getElementById('road2RuleText').textContent = road2On ? (road2Side + '側 ' + road2Width + 'm') : 'なし';
+        document.getElementById('road2RuleText').textContent = extras.length ? extras.map(function (e) { return sideName(e.side) + ' ' + e.width + 'm' + (e.level ? '（高低差' + e.level + 'm）' : ''); }).join('、') + (extras.length ? '／複数道路の緩和（令132条）を自動適用' : '') : 'なし';
+        document.getElementById('covRuleText').textContent = covText;
+        document.getElementById('farRuleText').textContent = farText;
 
         document.getElementById('result').style.display = 'block';
         document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
