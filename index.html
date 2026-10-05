@@ -160,6 +160,8 @@
       <option value="on">適用する（道路幅員12m未満のとき）</option>
       <option value="off">適用しない</option>
     </select>
+    <input type="number" id="tokuteiDist" step="1" min="0" placeholder="特定道路（幅員15m以上）までの距離 m（任意）" style="margin-top:6px">
+    <div class="esub-note">前面道路が6m以上12m未満で、幅員15m以上の道路まで70m未満のとき、道路に沿った距離を入れると割増します（法52条9項）。</div>
   </div>
   <div class="form-group">
     <label>高度地区</label>
@@ -1184,8 +1186,17 @@
         if (document.getElementById('farRoadMode').value === 'on' && zoningKey && maxRoadW < 12) {
           const resType = ['1low', '2low', 'rural', '1mid', '2mid', '1res', '2res', 'quasi'].indexOf(zoningKey) >= 0;
           const k = resType ? 0.4 : 0.6;
-          const lim = Math.round(maxRoadW * k * 1000) / 10;
-          farText = '法定' + farLegal + '% ／ 道路幅員 ' + maxRoadW + 'm×' + k + '＝' + lim + '%';
+          const tL = gv('tokuteiDist');
+          let effW = maxRoadW, tokText = '';
+          if (tL >= 0 && tL < 70 && maxRoadW >= 6 && isFinite(tL)) {
+            const wa = (12 - maxRoadW) * (70 - tL) / 70;
+            effW = maxRoadW + wa;
+            tokText = '（特定道路 ' + tL + 'm：+' + wa.toFixed(2) + 'm）';
+          } else if (tL > 0 && maxRoadW < 6) {
+            tokText = '（前面道路が6m未満のため特定道路の緩和なし）';
+          }
+          const lim = Math.round(effW * k * 1000) / 10;
+          farText = '法定' + farLegal + '% ／ 道路幅員 ' + (tokText && effW !== maxRoadW ? effW.toFixed(2) : maxRoadW) + 'm' + tokText + '×' + k + '＝' + lim + '%';
           if (lim < farLegal) { farUse = lim; farNote = '（道路幅員で' + lim + '%に制限）'; farText += ' → ' + lim + '%を採用'; }
           else farText += ' → 法定の方が小さいので法定を採用';
         } else if (document.getElementById('farRoadMode').value === 'on' && !zoningKey && maxRoadW < 12) {
