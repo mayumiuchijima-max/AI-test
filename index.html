@@ -122,8 +122,8 @@
       .ph-table th { width: 14%; background: #f1f5f9; text-align: left; padding: 3px 6px; border: 1px solid #cbd5e1; }
       .ph-table td { padding: 3px 6px; border: 1px solid #cbd5e1; }
       #printFooter { display: none; }
-      #print3d { display: block; width: 100%; }
-      #canvas-container { height: auto !important; background: none; }
+      #print3d { display: block; width: 100%; height: 100%; object-fit: contain; }
+      #canvas-container { height: 95mm !important; background: none; break-inside: avoid; }
       .plan, .tile, table.ftable tr { break-inside: avoid; }
     }
   </style>
@@ -392,6 +392,19 @@
       "exclusive-ind": { coverage: 60, far: 200, slope: 1.5, absHeight: null, northStart: null, northSlope: null, adjStart: 31, adjSlope: 2.5 }
     };
 
+    function snap3D() {
+      try {
+        if (!(renderer && scene && camera)) return;
+        renderer.render(scene, camera);
+        let img = document.getElementById('print3d');
+        if (!img) {
+          img = document.createElement('img'); img.id = 'print3d'; img.alt = '3Dモデル';
+          document.getElementById('canvas-container').appendChild(img);
+        }
+        img.src = renderer.domElement.toDataURL('image/png');
+      } catch (e) { console.error(e); }
+    }
+
     function preparePrint() {
       const g = function (id) { return document.getElementById(id).value; };
       const t = function (id, v) { document.getElementById(id).textContent = v || '―'; };
@@ -404,17 +417,7 @@
       const other = document.getElementById('road2RuleText').textContent;
       t('phRoads', front + (other && other !== 'なし' ? '／' + other : ''));
       document.querySelectorAll('details.rules').forEach(function (d) { d.open = true; });
-      try {
-        if (renderer && scene && camera) {
-          renderer.render(scene, camera);
-          let img = document.getElementById('print3d');
-          if (!img) {
-            img = document.createElement('img'); img.id = 'print3d';
-            document.getElementById('canvas-container').appendChild(img);
-          }
-          img.src = renderer.domElement.toDataURL('image/png');
-        }
-      } catch (e) { console.error(e); }
+      snap3D();
     }
     window.addEventListener('beforeprint', preparePrint);
 
@@ -573,6 +576,7 @@
     }
 
     let scene, camera, renderer, group;
+    let currentFloors = [];
     let dyn = [];            
     let animating = false;   
     let currentPark = 0;
@@ -1174,6 +1178,22 @@
       const H = fl1 + floorCount * floorH + 2.0;
       buildEnvelope(fp, H).forEach(buildRegion);
 
+      // 各階の上端高さでの建築可能範囲の輪郭線（斜線で削られる位置の目安）
+      const lineMat = new THREE.LineBasicMaterial({ color: 0x1e293b });
+      currentFloors.forEach(function (f) {
+        const y = fl1 + f.floor * floorH;
+        f.rects.forEach(function (r) {
+          const e = 0.03;
+          const x0 = r.x0 - e, x1 = r.x1 + e, z0 = r.z0 - e, z1 = r.z1 + e;
+          const pts = [
+            new THREE.Vector3(x0, y, z0), new THREE.Vector3(x1, y, z0),
+            new THREE.Vector3(x1, y, z1), new THREE.Vector3(x0, y, z1),
+            new THREE.Vector3(x0, y, z0)
+          ];
+          group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+        });
+      });
+
       scene.add(group);
       updateClipPlanes();
 
@@ -1418,8 +1438,10 @@
           return '<div class="tile"><div class="tl">' + label + '</div><div class="tv">' + value + '</div><div class="ts">' + sub + '</div></div>';
         };
         document.getElementById('summary').innerHTML =
-          tile('延床面積', actualTotalFloor.toFixed(1) + '<small>㎡</small>', '上限 ' + maxTotalFloor.toFixed(1) + '㎡（' + simFAR.toFixed(0) + '%）' + farNote) +
+          tile('延床面積', actualTotalFloor.toFixed(1) + '<small>㎡</small>', '上限 ' + maxTotalFloor.toFixed(1) + '㎡') +
           tile('建築面積', actualBuildingArea.toFixed(1) + '<small>㎡</small>', '上限 ' + maxBuildingArea.toFixed(1) + '㎡' + coverageNote) +
+          tile('建ぺい率', simCoverage.toFixed(1) + '<small>%</small>', '上限 ' + coverageUse + '%') +
+          tile('容積率', simFAR.toFixed(1) + '<small>%</small>', '上限 ' + farUse + '%' + farNote) +
           tile('階数', floors.length + '<small>階</small>', '敷地 ' + siteArea.toFixed(1) + '㎡');
 
         let html = '';
@@ -1455,8 +1477,10 @@
         document.getElementById('result').style.display = 'block';
         document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
         
+        currentFloors = floors.map(function (f) { return { floor: f.floor, rects: f.rects }; });
         try {
           update3D(siteW, siteD, fpFinal, setback, road, slope, fl1, floorH, floors.length, roadLevel, nvec);
+          snap3D();
         } catch (err) {
           console.error(err);
         }
