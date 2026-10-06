@@ -165,7 +165,7 @@
   <h1>簡易ボリューム検討ツール<span class="ver">変形地版</span></h1>
   <div class="byline">株式会社スカイリブ環境計画　<span class="vstamp">版 2026-10-06 17:05</span></div>
   <div id="errBanner" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:0.75rem;word-break:break-all"></div>
-  <script>window.addEventListener("error",function(e){var b=document.getElementById("errBanner");if(!b)return;b.style.display="block";b.textContent="エラー: "+(e.message||"読み込み失敗")+(e.filename?" ("+String(e.filename).split("/").pop()+":"+e.lineno+")":"");});</script>
+  <script>window.__errs=[];window.addEventListener("error",function(e){var b=document.getElementById("errBanner");if(!b)return;window.__errs.push((e.message||"読み込み失敗")+(e.filename?" ("+String(e.filename).split("/").pop()+":"+e.lineno+":"+e.colno+")":""));b.style.display="block";b.innerHTML="エラー一覧（古い順）:<br>"+window.__errs.map(function(t,k){return (k+1)+". "+t.replace(/</g,"&lt;");}).join("<br>");});window.addEventListener("load",function(){if(!window.__appLoaded){var b=document.getElementById("errBanner");b.style.display="block";b.innerHTML+=(b.innerHTML?"<br>":"")+"本体のプログラムが最後まで実行されていません。";}});</script>
 
   <div class="form-group">
     <label>物件名 / 所在地（PDFに印字されます）</label>
@@ -1847,4 +1847,53 @@
         };
 
         document.getElementById('slopeRatio').textContent = slope;
-        docum
+        document.getElementById('applyDistText').textContent = applyDist != null ? (applyDist + 'm（各道路の反対側の境界から。法定容積率 ' + farLegal + '%）') : '用途地域が未選択のため、距離の制限なし';
+        document.getElementById('heightLimit').textContent = ((road + parkFront + setback) * slope).toFixed(2);
+        document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
+        document.getElementById('heightRuleText').textContent = heightLabel;
+        document.getElementById('adjRuleText').textContent = z.adjStart != null ? (z.adjStart + 'm＋' + z.adjSlope + '／後退緩和：' + (gapsText || 'なし') + ' ぶん境界を外側とみなす') : 'なし';
+        document.getElementById('judgeText').textContent = judgeTop ? '各階の上端高さ' : '各階床高さ';
+        document.getElementById('northRuleText').textContent = z.northStart !== null ? (z.northStart + 'm + ' + z.northSlope + '（北側が隣地の辺は、離れぶん後退緩和）') : 'なし';
+        document.getElementById('road2RuleText').textContent = otherRoads.length ? otherRoads.map(function (x) {
+          return edgeName(x.i).replace(/（.*?）/, '') + ' ' + x.e.width + 'm' + (x.e.park ? '＋公園等' + x.e.park + 'm' : '') + (x.e.level ? '（高低差' + x.e.level + 'm）' : '');
+        }).join('、') + '／複数道路の緩和（令132条）を自動適用' : 'なし';
+        document.getElementById('covRuleText').textContent = covText;
+        document.getElementById('farRuleText').textContent = farText;
+
+        document.getElementById('result').style.display = 'block';
+        document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        try {
+          update3D(S, gaps, fpFinal, floors, fl1, floorH, nvec);
+          snap3D();
+        } catch (err) {
+          console.error(err);
+        }
+      } catch (err) {
+        document.getElementById('result').style.display = 'block';
+        document.getElementById('floorAreas').innerHTML = '計算エラー: ' + err.message;
+      }
+    }
+
+    /* ================= 起動 ================= */
+    initCompass();
+    initEdgeCards();
+    initEditor();
+    initTable();
+    (function () {
+      const w = document.getElementById('width'), d = document.getElementById('depth');
+      [w, d].forEach(function (el) {
+        el.addEventListener('input', function () { if (!(poly && polyCustom)) onDimInput(); });
+        el.addEventListener('change', onDimInput);
+      });
+      document.getElementById('road').addEventListener('input', function () { if (poly) renderEditor(true); });
+      ['bldgWidth', 'bldgDepth'].forEach(function (id) { document.getElementById(id).addEventListener('change', placeBldgRect); });
+      window.addEventListener('resize', function () { if (poly) renderEditor(true); });
+    })();
+    renderAll();
+
+window.__appLoaded = true;
+
+  </script>
+</body>
+</html>
