@@ -1509,6 +1509,36 @@
       return new THREE.Mesh(geo, mat);
     }
 
+    // 高さの目盛り：敷地の脇に立てた物差し（各階の天端の高さを表示）
+    function labelSprite(text) {
+      const cv = document.createElement('canvas');
+      cv.width = 160; cv.height = 56;
+      const c = cv.getContext('2d');
+      c.font = 'bold 34px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.lineWidth = 7; c.strokeStyle = 'rgba(255,255,255,0.95)'; c.strokeText(text, 80, 29);
+      c.fillStyle = '#1e293b'; c.fillText(text, 80, 29);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true }));
+      sp.scale.set(2.9, 1.0, 1);
+      sp.renderOrder = 20;
+      return sp;
+    }
+    function addHeightRuler(grp, x, z, levels, topH) {
+      const mat = new THREE.LineBasicMaterial({ color: 0x475569 });
+      const seg = function (x0, y0, x1, y1) {
+        grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x0, y0, z), new THREE.Vector3(x1, y1, z)]), mat));
+      };
+      seg(x, 0, x, topH);
+      for (let h = 0; h <= topH + 1e-6; h += 1) seg(x - 0.2, h, x + 0.2, h);
+      const mark = function (h, text) {
+        seg(x - 0.2, h, x + 0.7, h);
+        const sp = labelSprite(text);
+        sp.position.set(x + 2.3, h, z);
+        grp.add(sp);
+      };
+      mark(0, 'GL');
+      levels.forEach(function (lv) { mark(lv.h, lv.h.toFixed(1) + 'm'); });
+    }
+
     function update3D(S, gaps, fpFinal, floors, fl1, floorH, nvec) {
       if (!scene) init3D();
       if (group) scene.remove(group);
@@ -1554,13 +1584,19 @@
 
       // 各階の上端高さでの建築可能範囲の輪郭線（斜線で削られる位置の目安）
       const lineMat = new THREE.LineBasicMaterial({ color: 0x1e293b });
+      const lineHid = new THREE.LineBasicMaterial({ color: 0x1e293b, transparent: true, opacity: 0.3, depthWrite: false });
+      lineHid.depthFunc = 516; // GreaterDepth：面の裏に隠れた部分だけ薄く描く
       floors.forEach(function (f) {
         const y = fl1 + f.floor * floorH + 0.02;
         f.polys.forEach(function (p) {
           const pts = p.concat([p[0]]).map(function (q) { return new THREE.Vector3(q.x, y, q.z); });
-          group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat));
+          const lg = new THREE.BufferGeometry().setFromPoints(pts);
+          group.add(new THREE.Line(lg, lineMat));
+          group.add(new THREE.Line(lg, lineHid));
         });
       });
+      const rx = Math.max.apply(null, S.pts.map(function (q) { return q.x; })) + 1.2;
+      addHeightRuler(group, rx, 0, floors.map(function (f) { return { h: fl1 + f.floor * floorH }; }), H);
 
       scene.add(group);
       if (!animating) {
@@ -1812,40 +1848,4 @@
         document.getElementById('heightLimit').textContent = ((road + parkFront + setback) * slope).toFixed(2);
         document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
         document.getElementById('heightRuleText').textContent = heightLabel;
-        document.getElementById('adjRuleText').textContent = z.adjStart != null ? (z.adjStart + 'm＋' + z.adjSlope + '／後退緩和：' + (gapsText || 'なし') + ' ぶん境界を外側とみなす') : 'なし';
-        document.getElementById('judgeText').textContent = judgeTop ? '各階の上端高さ' : '各階床高さ';
-        document.getElementById('northRuleText').textContent = z.northStart !== null ? (z.northStart + 'm + ' + z.northSlope + '（北側が隣地の辺は、離れぶん後退緩和）') : 'なし';
-        document.getElementById('road2RuleText').textContent = otherRoads.length ? otherRoads.map(function (x) {
-          return edgeName(x.i).replace(/（.*?）/, '') + ' ' + x.e.width + 'm' + (x.e.park ? '＋公園等' + x.e.park + 'm' : '') + (x.e.level ? '（高低差' + x.e.level + 'm）' : '');
-        }).join('、') + '／複数道路の緩和（令132条）を自動適用' : 'なし';
-        document.getElementById('covRuleText').textContent = covText;
-        document.getElementById('farRuleText').textContent = farText;
-
-        document.getElementById('result').style.display = 'block';
-        document.getElementById('result').scrollIntoView({ behavior: 'smooth', block: 'start' });
-
-        try {
-          update3D(S, gaps, fpFinal, floors, fl1, floorH, nvec);
-          snap3D();
-        } catch (err) {
-          console.error(err);
-        }
-      } catch (err) {
-        document.getElementById('result').style.display = 'block';
-        document.getElementById('floorAreas').innerHTML = '計算エラー: ' + err.message;
-      }
-    }
-
-    /* ================= 起動 ================= */
-    initCompass();
-    initEdgeCards();
-    initEditor();
-    initTable();
-    (function () {
-      const w = document.getElementById('width'), d = document.getElementById('depth');
-      [w, d].forEach(function (el) {
-        el.addEventListener('input', function () { if (!(poly && polyCustom)) onDimInput(); });
-        el.addEventListener('change', onDimInput);
-      });
-      document.getElementById('road').addEventListener('input', function () { if (poly) renderEditor(true); });
-      ['bldgWidth', 'bl
+        document.getElementById('adjRuleText').textContent = z.adjStart != null ? (z.adjStart + 'm＋' + z.adjSlope + '／後退緩和：' + (gapsText || 'なし') + '
