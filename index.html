@@ -133,6 +133,30 @@
     .byline { margin: -6px 0 10px; font-size: 0.72rem; letter-spacing: 0.08em; color: #64748b; }
     .sitefoot { margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 0.72rem; color: #94a3b8; }
     @media print { #errBanner, .byline, .sitefoot { display: none !important; } }
+    details.shade { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; background: #fff; }
+    details.shade summary { cursor: pointer; font-weight: 600; color: #1e3a8a; padding: 4px 0; }
+    .chk { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 0.85rem; }
+    .chk input { width: auto; }
+    #shadeResult { margin-top: 12px; }
+    .shadecard { padding: 8px; break-inside: avoid; }
+    .shade-sum { font-weight: 700; text-align: center; padding: 6px; border-radius: 6px; margin-bottom: 6px; font-size: 0.9rem; }
+    .shade-sum.ok { background: #dcfce7; color: #166534; }
+    .shade-sum.ng { background: #fee2e2; color: #991b1b; }
+    .shade-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.68rem; color: #475569; margin: 6px 0; }
+    .shade-legend i { display: inline-block; width: 12px; height: 10px; vertical-align: middle; margin-right: 4px; }
+    .shade-note { font-size: 0.7rem; color: #64748b; line-height: 1.6; margin-top: 6px; }
+    .shadetbl { margin-top: 4px; }
+    .shadecard .warn { font-size: 0.78rem; margin-top: 6px; }
+    .shade-fit { margin: 8px 0; }
+    .shadebtn { width: 100%; padding: 10px 12px; font-size: 0.85rem; font-weight: 600; border: 1px solid #1e3a8a; background: #1e3a8a; color: #fff; border-radius: 8px; cursor: pointer; }
+    .shadebtn.sub { background: #fff; color: #1e3a8a; }
+    @media print { .shade-fit .shadebtn { display: none !important; } }
+
+    .shade-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }
+    details.shade .hint { text-align: left; font-size: 0.72rem; }
+    details.shade select, details.shade input[type=number] { font-size: 0.9rem; padding: 8px; }
+    .chk input { width: auto; }
+    @media print { .shadebtn { display: none !important; } }
     .shape-title { font-size: 0.8rem; font-weight: 700; color: #1e3a8a; margin: 10px 0 4px; }
     .dim-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .dim-row label { flex: 1 1 110px; font-size: 0.72rem; color: #1e3a8a; font-weight: 600; }
@@ -380,6 +404,7 @@
     <div class="summary" id="summary"></div>
     <div id="floorAreas"></div>
     <div class="plans" id="floorPlans"></div>
+    <div id="shadeResult"></div>
     <div id="shadeResult"></div>
     <details class="rules">
       <summary>適用した規制の内容</summary>
@@ -1924,9 +1949,9 @@
     }
 
     // 階ごとに北側を後退させて、日影規制を満たす形にする
-    function shadeFitFloors(S, floors, nvec, fl1, floorH) {
-      const P = shadeParams();
-      const dot = function (q) { return q.x * nvec.nx + q.z * nvec.nz; };
+    function shadeFitFloors(S, floors, nvec, fl1, floorH, cutVec) {
+      const P = shadeParams(), cv = cutVec || nvec;
+      const dot = function (q) { return q.x * cv.nx + q.z * cv.nz; };
       let cmax = -Infinity;
       floors.forEach(function (f) { f.polys.forEach(function (p) { p.forEach(function (q) { cmax = Math.max(cmax, dot(q)); }); }); });
       const spans = floors.map(function (f) {
@@ -1939,7 +1964,7 @@
           if (!isFinite(cuts[k])) break;
           let polys = floors[k].polys;
           if (cuts[k] > 0) {
-            polys = polys.map(function (p) { return cleanPoly(clipHalf(p, -nvec.nx, -nvec.nz, -(cmax - cuts[k]))); }).filter(function (p) { return p.length >= 3 && absArea(p) > 0.3; });
+            polys = polys.map(function (p) { return cleanPoly(clipHalf(p, -cv.nx, -cv.nz, -(cmax - cuts[k]))); }).filter(function (p) { return p.length >= 3 && absArea(p) > 0.3; });
           }
           const a = totalArea(polys);
           if (a < 5) break;
@@ -2170,6 +2195,15 @@
       if (!isOk(chk)) return null;
       const areas = floors.map(function (f, k) { return { floor: f.floor, before: f.area, after: k < out.length ? out[k].area : 0 }; }).filter(function (a) { return Math.abs(a.after - a.before) > 0.05; });
       return { floors: out, cuts: [], areas: areas };
+    }
+
+    // 自動で削る方式と北側後退方式を両方試して、残る延床面積が大きいほうを使う
+    function shadeFitBest(S, floors, nvec, fl1, floorH, cutVec) {
+      const a = shadeFitVoxel(S, floors, nvec, fl1, floorH);
+      if (a && a.noChange) return a;
+      const b = shadeFitFloors(S, floors, nvec, fl1, floorH, cutVec);
+      const area = function (r) { return r && r.floors ? r.floors.reduce(function (t, f) { return t + f.area; }, 0) : -1; };
+      return area(b) > area(a) + 1e-6 ? b : a;
     }
 
     function runShade(S, floors, nvec, fl1, floorH, fitInfo) {
@@ -2403,7 +2437,7 @@
         shadeFitMsg = '';
         if (fitReq && document.getElementById('shadeOn').checked && floors.length) {
           const before = floors.reduce(function (s, f) { return s + f.area; }, 0);
-          const fr = fitReq === 'voxel' ? shadeFitVoxel(S, floors, nvec, fl1, floorH) : shadeFitFloors(S, floors, nvec, fl1, floorH);
+          const fr = fitReq === 'voxel' ? shadeFitBest(S, floors, nvec, fl1, floorH) : shadeFitFloors(S, floors, nvec, fl1, floorH);
           if (!fr) shadeFitMsg = 'この敷地・条件では、規制を満たす形を作れませんでした（低い階だけでも規制を超えます）。測定面・規制時間・敷地の形を見直してください。';
           else if (fr.noChange) shadeFitMsg = '調整は不要でした。';
           else {
