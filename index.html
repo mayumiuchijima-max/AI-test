@@ -159,6 +159,21 @@
     .ecard.front .efields label { color: #fff; }
     .ecard.front .efields input { color: #111; }
     .hint { font-size: 0.72rem; color: #64748b; margin: 4px 0 8px; line-height: 1.5; }
+
+    details.shade { margin: 10px 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; background: #fff; }
+    details.shade summary { cursor: pointer; font-weight: 600; color: #1e3a8a; padding: 4px 0; }
+    .chk { display: flex; gap: 8px; align-items: center; margin: 6px 0; font-size: 0.85rem; }
+    .chk input { width: auto; }
+    #shadeResult { margin-top: 12px; }
+    .shadecard { padding: 8px; break-inside: avoid; }
+    .shade-sum { font-weight: 700; text-align: center; padding: 6px; border-radius: 6px; margin-bottom: 6px; font-size: 0.9rem; }
+    .shade-sum.ok { background: #dcfce7; color: #166534; }
+    .shade-sum.ng { background: #fee2e2; color: #991b1b; }
+    .shade-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.68rem; color: #475569; margin: 6px 0; }
+    .shade-legend i { display: inline-block; width: 12px; height: 10px; vertical-align: middle; margin-right: 4px; }
+    .shade-note { font-size: 0.7rem; color: #64748b; line-height: 1.6; margin-top: 6px; }
+    .shadetbl { margin-top: 4px; }
+    .shadecard .warn { font-size: 0.78rem; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -329,6 +344,18 @@
       <label>階高 m<input type="number" id="floorHeight" step="0.1" value="3.0"></label>
     </div>
     <div class="hint">縦横を入れると、敷地の中に長方形の建物を置きます。図のオレンジの点をドラッグして多角形にもできます（辺の「＋」で点を追加、点を選んで削除、建物の中をドラッグで移動）。</div>
+    <details class="shade" id="shadeBox">
+      <summary>日影規制の検討（冬至日）</summary>
+      <label class="chk"><input type="checkbox" id="shadeOn"> 日影規制を検討する</label>
+      <div class="dim-row">
+        <label>測定面の高さ<select id="shadeH"><option value="1.5">GL＋1.5m</option><option value="4" selected>GL＋4m</option><option value="6.5">GL＋6.5m</option></select></label>
+        <label>規制時間（5〜10m／10m超）<select id="shadeT"><option value="3,2">3h－2h</option><option value="4,2.5" selected>4h－2.5h</option><option value="5,3">5h－3h</option></select></label>
+        <label>地域（緯度）<select id="shadeCity"><option value="43.06" data-hk="1">札幌（北緯43.06°）</option><option value="43.77" data-hk="1">旭川（北緯43.77°）</option><option value="41.77" data-hk="1">函館（北緯41.77°）</option><option value="38.27">仙台（北緯38.27°）</option><option value="37.92">新潟（北緯37.92°）</option><option value="36.56">金沢（北緯36.56°）</option><option value="35.68" selected>東京（北緯35.68°）</option><option value="35.44">横浜（北緯35.44°）</option><option value="35.18">名古屋（北緯35.18°）</option><option value="35.01">京都（北緯35.01°）</option><option value="34.69">大阪（北緯34.69°）</option><option value="34.69">神戸（北緯34.69°）</option><option value="34.39">広島（北緯34.39°）</option><option value="34.34">高松（北緯34.34°）</option><option value="33.59">福岡（北緯33.59°）</option><option value="26.21">那覇（北緯26.21°）</option><option value="custom">数値で指定</option></select></label>
+        <label>緯度（北緯・数値）<input type="number" id="shadeLat" step="0.01" value="35.68"></label>
+        <label>隣地との高低差 m（隣地が低いとき）<input type="number" id="shadeDiff" step="0.1" value="0"></label>
+      </div>
+      <div class="hint" id="shadeZoneHint">用途地域を選ぶと、測定面の高さ・規制時間の初期値が入ります。北海道の都市を選ぶと、測定時間は午前9時〜午後3時になります。実際の指定は自治体の条例で確認してください。</div>
+    </details>
     <input type="hidden" id="roadDeg" value="180">
   </div>
 
@@ -350,6 +377,7 @@
     <div class="summary" id="summary"></div>
     <div id="floorAreas"></div>
     <div class="plans" id="floorPlans"></div>
+    <div id="shadeResult"></div>
     <details class="rules">
       <summary>適用した規制の内容</summary>
       <div class="result-item">斜線の判定高さ： <strong id="judgeText"></strong></div>
@@ -1611,6 +1639,298 @@
       }
     }
 
+    /* ================= 日影規制（冬至日の日影時間） ================= */
+    const SHADE_PRESET = {
+      '1low': { h: '1.5', t: '3,2', kind: 'low' }, '2low': { h: '1.5', t: '3,2', kind: 'low' }, 'rural': { h: '1.5', t: '3,2', kind: 'low' },
+      '1mid': { h: '4', t: '4,2.5', kind: 'high' }, '2mid': { h: '4', t: '4,2.5', kind: 'high' },
+      '1res': { h: '4', t: '4,2.5', kind: 'high' }, '2res': { h: '4', t: '4,2.5', kind: 'high' }, 'quasi': { h: '4', t: '4,2.5', kind: 'high' },
+      'neighbor': { h: '4', t: '5,3', kind: 'high' }, 'quasi-ind': { h: '4', t: '5,3', kind: 'high' }
+    };
+    function shadePreset() {
+      const key = document.getElementById('zoning').value;
+      const p = SHADE_PRESET[key];
+      const hint = document.getElementById('shadeZoneHint');
+      if (!p) { if (hint) hint.textContent = key ? 'この用途地域は、一般に日影規制の対象区域ではありません（条例で指定されている場合は、下の設定を選んでください）。' : ''; return; }
+      document.getElementById('shadeH').value = p.h;
+      document.getElementById('shadeT').value = p.t;
+      if (hint) hint.textContent = '測定面の高さ・規制時間の初期値を入れました。実際の指定は、自治体の条例で必ず確認してください。';
+    }
+
+    // 太陽の向き（冬至・真太陽時 hour）。e=東, n=北, u=上 の単位ベクトル
+    function sunDirAt(latDeg, hour) {
+      const phi = latDeg * Math.PI / 180, del = -23.4393 * Math.PI / 180, H = (hour - 12) * 15 * Math.PI / 180;
+      return {
+        u: Math.sin(phi) * Math.sin(del) + Math.cos(phi) * Math.cos(del) * Math.cos(H),
+        n: Math.cos(phi) * Math.sin(del) - Math.sin(phi) * Math.cos(del) * Math.cos(H),
+        e: -Math.cos(del) * Math.sin(H)
+      };
+    }
+    function pointInPoly2(x, z, poly) {
+      let c = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const a = poly[i], b = poly[j];
+        if ((a.z > z) !== (b.z > z) && x < (b.x - a.x) * (z - a.z) / (b.z - a.z) + a.x) c = !c;
+      }
+      return c;
+    }
+    function segCross(ax, az, bx, bz, cx, cz, dx, dz) {
+      const d1 = (bx - ax) * (cz - az) - (bz - az) * (cx - ax), d2 = (bx - ax) * (dz - az) - (bz - az) * (dx - ax);
+      const d3 = (dx - cx) * (az - cz) - (dz - cz) * (ax - cx), d4 = (dx - cx) * (bz - cz) - (dz - cz) * (bx - cx);
+      return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0));
+    }
+    function segHitsPoly(ax, az, bx, bz, poly) {
+      if (pointInPoly2(ax, az, poly) || pointInPoly2(bx, bz, poly)) return true;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        if (segCross(ax, az, bx, bz, poly[j].x, poly[j].z, poly[i].x, poly[i].z)) return true;
+      }
+      return false;
+    }
+    function distToSegXZ(px, pz, A, B) {
+      const dx = B.x - A.x, dz = B.z - A.z, l2 = dx * dx + dz * dz;
+      let t = l2 > 0 ? ((px - A.x) * dx + (pz - A.z) * dz) / l2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (A.x + t * dx), pz - (A.z + t * dz));
+    }
+    // 道路・水路などに接する辺は、幅の1/2（幅10m超は反対側境界から5m）だけ外側を敷地境界線とみなす
+    function shadeEdgeOffset(e) {
+      if (!e || e.type !== 'road') return 0;
+      const w = e.width || 0;
+      return w <= 10 ? w / 2 : w - 5;
+    }
+    function shadeBoundaryDist(x, z, S) {
+      if (pointInPoly2(x, z, S.pts)) return -1;
+      let best = Infinity;
+      for (let i = 0; i < S.pts.length; i++) {
+        const d = distToSegXZ(x, z, S.pts[i], S.pts[(i + 1) % S.pts.length]) - shadeEdgeOffset(S.edges[i]);
+        if (d < best) best = d;
+      }
+      return best;
+    }
+
+    function shadeCityInit() {
+      const c = document.getElementById('shadeCity'), l = document.getElementById('shadeLat');
+      c.addEventListener('change', function () { if (c.value !== 'custom') l.value = c.value; });
+      l.addEventListener('input', function () {
+        const v = parseFloat(l.value);
+        const hit = Array.prototype.find.call(c.options, function (op) { return op.value !== 'custom' && parseFloat(op.value) === v; });
+        c.value = hit ? hit.value : 'custom';
+      });
+    }
+    function shadeIsHokkaido() {
+      const c = document.getElementById('shadeCity');
+      return c.value !== 'custom' && !!c.options[c.selectedIndex].getAttribute('data-hk');
+    }
+
+    function computeShade(o) {
+      const S = o.S, step = o.step || 0.5;
+      const bb = polyBBox(S.pts), M = 30;
+      const x0 = bb.x0 - M, z0 = bb.z0 - M;
+      const nx = Math.ceil((bb.x1 - bb.x0 + 2 * M) / step) + 1, nz = Math.ceil((bb.z1 - bb.z0 + 2 * M) / step) + 1;
+      const east = { x: o.nvec.nz, z: -o.nvec.nx }, north = { x: o.nvec.nx, z: o.nvec.nz };
+      // 時刻ごとの太陽（8:00〜16:00を5分刻み、各区間の中央）
+      const dt = 5 / 60, sun = [];
+      const tA = o.t0 || 8, tB = o.t1 || 16;
+      for (let t = tA + dt / 2; t < tB; t += dt) {
+        const s = sunDirAt(o.lat, t);
+        if (s.u > 0.02) sun.push({ kx: (s.e * east.x + s.n * north.x) / s.u, kz: (s.e * east.z + s.n * north.z) / s.u });
+      }
+      const prisms = o.floors.map(function (f) {
+        return { lo: f.lo, hi: f.hi, polys: f.polys.filter(function (p) { return p.length >= 3; }) };
+      }).filter(function (p) { return p.polys.length; });
+      let Hmax = 0; const bx = { x0: 1e9, x1: -1e9, z0: 1e9, z1: -1e9 };
+      prisms.forEach(function (pr) {
+        Hmax = Math.max(Hmax, pr.hi);
+        pr.polys.forEach(function (p) { p.forEach(function (q) { bx.x0 = Math.min(bx.x0, q.x); bx.x1 = Math.max(bx.x1, q.x); bx.z0 = Math.min(bx.z0, q.z); bx.z1 = Math.max(bx.z1, q.z); }); });
+      });
+      const hrs = new Float32Array(nx * nz), dist = new Float32Array(nx * nz);
+      const h = o.planeH, per = dt;
+      for (let j = 0; j < nz; j++) {
+        const z = z0 + j * step;
+        for (let i = 0; i < nx; i++) {
+          const x = x0 + i * step, idx = j * nx + i;
+          dist[idx] = shadeBoundaryDist(x, z, S);
+          if (dist[idx] > 32) continue;
+          if (Hmax <= h) continue;
+          let cnt = 0;
+          for (let k = 0; k < sun.length; k++) {
+            const kx = sun[k].kx, kz = sun[k].kz;
+            // 測定点から太陽へ向かう光線の、建物の最高部までの水平な動き
+            const ex = x + (Hmax - h) * kx, ez = z + (Hmax - h) * kz;
+            if (Math.max(x, ex) < bx.x0 || Math.min(x, ex) > bx.x1 || Math.max(z, ez) < bx.z0 || Math.min(z, ez) > bx.z1) continue;
+            let hit = false;
+            for (let q = 0; q < prisms.length && !hit; q++) {
+              const pr = prisms[q];
+              if (pr.hi <= h) continue;
+              const ya = Math.max(pr.lo, h);
+              const ax = x + (ya - h) * kx, az = z + (ya - h) * kz, cx = x + (pr.hi - h) * kx, cz = z + (pr.hi - h) * kz;
+              for (let r = 0; r < pr.polys.length; r++) { if (segHitsPoly(ax, az, cx, cz, pr.polys[r])) { hit = true; break; } }
+            }
+            if (hit) cnt++;
+          }
+          hrs[idx] = cnt * per;
+        }
+      }
+      // 判定
+      const lim = o.limits; // {near, far}
+      let maxNear = 0, maxFar = 0, exceedCells = 0, worst = null;
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+        const idx = j * nx + i, d = dist[idx], v = hrs[idx];
+        if (d <= 5 || d > 32) continue;
+        const L = d <= 10 ? lim.near : lim.far;
+        if (d <= 10) maxNear = Math.max(maxNear, v); else maxFar = Math.max(maxFar, v);
+        if (v > L + 1e-6) {
+          exceedCells++;
+          const ex = v - L;
+          if (!worst || ex > worst.ex) worst = { ex: ex, x: x0 + i * step, z: z0 + j * step, v: v };
+        }
+      }
+      return { x0: x0, z0: z0, nx: nx, nz: nz, step: step, hrs: hrs, dist: dist, maxNear: maxNear, maxFar: maxFar,
+        exceedArea: exceedCells * step * step, worst: worst, lim: lim, bx: bx };
+    }
+
+    // 等高線（marching squares）
+    function contourSegs(vals, nx, nz, x0, z0, step, level) {
+      const segs = [];
+      const P = function (i0, j0, i1, j1) {
+        const a = vals[j0 * nx + i0], b = vals[j1 * nx + i1], t = (b - a) === 0 ? 0.5 : (level - a) / (b - a);
+        return [x0 + (i0 + (i1 - i0) * t) * step, z0 + (j0 + (j1 - j0) * t) * step];
+      };
+      for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+        const v00 = vals[j * nx + i] >= level, v10 = vals[j * nx + i + 1] >= level, v11 = vals[(j + 1) * nx + i + 1] >= level, v01 = vals[(j + 1) * nx + i] >= level;
+        const c = (v00 ? 1 : 0) + (v10 ? 2 : 0) + (v11 ? 4 : 0) + (v01 ? 8 : 0);
+        if (c === 0 || c === 15) continue;
+        const bo = function () { return P(i, j, i + 1, j); }, ri = function () { return P(i + 1, j, i + 1, j + 1); };
+        const to = function () { return P(i, j + 1, i + 1, j + 1); }, le = function () { return P(i, j, i, j + 1); };
+        const add = function (a, b) { segs.push([a[0], a[1], b[0], b[1]]); };
+        switch (c) {
+          case 1: case 14: add(le(), bo()); break;
+          case 2: case 13: add(bo(), ri()); break;
+          case 3: case 12: add(le(), ri()); break;
+          case 4: case 11: add(ri(), to()); break;
+          case 5: add(le(), bo()); add(ri(), to()); break;
+          case 6: case 9: add(bo(), to()); break;
+          case 7: case 8: add(le(), to()); break;
+          case 10: add(bo(), ri()); add(le(), to()); break;
+        }
+      }
+      return segs;
+    }
+
+    function shadeSvg(res, S, floors, nvec) {
+      const st = res.step;
+      // 表示範囲：敷地と、日影が落ちる範囲
+      const sb = polyBBox(S.pts);
+      let X0 = sb.x0, X1 = sb.x1, Z0 = sb.z0, Z1 = sb.z1;
+      for (let j = 0; j < res.nz; j++) for (let i = 0; i < res.nx; i++) {
+        const idx = j * res.nx + i;
+        if (res.hrs[idx] > 0 && res.dist[idx] <= 30) {
+          const x = res.x0 + i * st, z = res.z0 + j * st;
+          X0 = Math.min(X0, x); X1 = Math.max(X1, x); Z0 = Math.min(Z0, z); Z1 = Math.max(Z1, z);
+        }
+      }
+      const mg = 4; X0 -= mg; X1 += mg; Z0 -= mg; Z1 += mg;
+      const i0 = Math.max(0, Math.floor((X0 - res.x0) / st)), i1 = Math.min(res.nx - 1, Math.ceil((X1 - res.x0) / st));
+      const j0 = Math.max(0, Math.floor((Z0 - res.z0) / st)), j1 = Math.min(res.nz - 1, Math.ceil((Z1 - res.z0) / st));
+      const cw = i1 - i0 + 1, ch = j1 - j0 + 1;
+      const cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+      const g = cv.getContext('2d');
+      const img = g.createImageData(cw, ch);
+      const cols = [[254, 243, 199], [253, 230, 138], [252, 211, 77], [245, 158, 11], [217, 119, 6]];
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+        const idx = j * res.nx + i, v = res.hrs[idx], d = res.dist[idx];
+        const px = ((j1 - j) * cw + (i - i0)) * 4;
+        if (v <= 0) continue;
+        const col = cols[Math.min(4, Math.floor(v))];
+        let a = 215;
+        let rgb = col;
+        const reg = d > 5 && d <= 32;
+        if (reg) {
+          const L = d <= 10 ? res.lim.near : res.lim.far;
+          if (v > L + 1e-6) { rgb = [220, 38, 38]; a = 200; }
+        } else a = 120;
+        img.data[px] = rgb[0]; img.data[px + 1] = rgb[1]; img.data[px + 2] = rgb[2]; img.data[px + 3] = a;
+      }
+      g.putImageData(img, 0, 0);
+      const url = cv.toDataURL('image/png');
+      const ix0 = res.x0 + i0 * st - st / 2, iz1 = res.z0 + j1 * st + st / 2;
+      const f2 = function (n) { return (Math.round(n * 100) / 100); };
+      let s = '<svg viewBox="' + f2(X0) + ' ' + f2(-Z1) + ' ' + f2(X1 - X0) + ' ' + f2(Z1 - Z0) + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">';
+      s += '<image href="' + url + '" x="' + f2(ix0) + '" y="' + f2(-iz1) + '" width="' + f2(cw * st) + '" height="' + f2(ch * st) + '" style="image-rendering:pixelated" preserveAspectRatio="none"/>';
+      // 道路
+      S.edges.forEach(function (e, i) {
+        if (e.type !== 'road') return;
+        const gg = edgeGeom(S.pts, i), w = e.width || 0;
+        const q = [[gg.A.x, gg.A.z], [gg.B.x, gg.B.z], [gg.B.x + gg.nout.x * w, gg.B.z + gg.nout.z * w], [gg.A.x + gg.nout.x * w, gg.A.z + gg.nout.z * w]];
+        s += '<polygon points="' + q.map(function (p) { return f2(p[0]) + ',' + f2(-p[1]); }).join(' ') + '" fill="#cbd5e1" fill-opacity="0.7"/>';
+      });
+      // 5m・10mライン
+      [5, 10].forEach(function (lv) {
+        const segs = contourSegs(res.dist, res.nx, res.nz, res.x0, res.z0, st, lv);
+        let d = '';
+        segs.forEach(function (q) { d += 'M' + f2(q[0]) + ' ' + f2(-q[1]) + 'L' + f2(q[2]) + ' ' + f2(-q[3]); });
+        s += '<path d="' + d + '" fill="none" stroke="#64748b" stroke-width="0.12" stroke-dasharray="0.6 0.5"/>';
+      });
+      // 規制時間の等時間線（それぞれの範囲内だけ）
+      const lines = [[res.lim.near, 5, 10], [res.lim.far, 10, 33]];
+      lines.forEach(function (ln) {
+        const segs = contourSegs(res.hrs, res.nx, res.nz, res.x0, res.z0, st, ln[0]);
+        let d = '';
+        segs.forEach(function (q) {
+          const mx = (q[0] + q[2]) / 2, mz = (q[1] + q[3]) / 2, dd = shadeBoundaryDist(mx, mz, S);
+          if (dd > ln[1] && dd <= ln[2]) d += 'M' + f2(q[0]) + ' ' + f2(-q[1]) + 'L' + f2(q[2]) + ' ' + f2(-q[3]);
+        });
+        s += '<path d="' + d + '" fill="none" stroke="#b91c1c" stroke-width="0.22"/>';
+      });
+      // 敷地・建物
+      s += '<polygon points="' + S.pts.map(function (p) { return f2(p.x) + ',' + f2(-p.z); }).join(' ') + '" fill="#dbeafe" fill-opacity="0.55" stroke="#1e3a8a" stroke-width="0.25"/>';
+      if (floors[0]) floors[0].polys.forEach(function (p) {
+        s += '<polygon points="' + p.map(function (q) { return f2(q.x) + ',' + f2(-q.z); }).join(' ') + '" fill="#3b82f6" stroke="#1e3a8a" stroke-width="0.15"/>';
+      });
+      if (res.worst) s += '<circle cx="' + f2(res.worst.x) + '" cy="' + f2(-res.worst.z) + '" r="0.7" fill="none" stroke="#7f1d1d" stroke-width="0.2"/>';
+      // 北矢印・スケール
+      const ax = X1 - 7, az = Z1 - 8, vx = nvec.nx, vy = -nvec.nz;
+      s += '<g stroke="#dc2626" stroke-width="0.4" fill="#dc2626"><line x1="' + f2(ax - vx * 3.5) + '" y1="' + f2(-az - vy * 3.5) + '" x2="' + f2(ax + vx * 3.5) + '" y2="' + f2(-az + vy * 3.5) + '"/><circle cx="' + f2(ax + vx * 3.5) + '" cy="' + f2(-az + vy * 3.5) + '" r="0.9"/><text x="' + f2(ax + vx * 6 - 1.2) + '" y="' + f2(-az + vy * 6 + 1) + '" font-size="3.2" stroke="none">北</text></g>';
+      s += '<g stroke="#334155" stroke-width="0.2"><line x1="' + f2(X0 + 2) + '" y1="' + f2(-Z0 - 2) + '" x2="' + f2(X0 + 12) + '" y2="' + f2(-Z0 - 2) + '"/></g><text x="' + f2(X0 + 2) + '" y="' + f2(-Z0 - 3) + '" font-size="2.6" fill="#334155">10m</text>';
+      s += '</svg>';
+      return s;
+    }
+
+    function runShade(S, floors, nvec, fl1, floorH, nTop) {
+      const box = document.getElementById('shadeResult');
+      if (!document.getElementById('shadeOn').checked) { box.innerHTML = ''; return null; }
+      if (!floors.length) { box.innerHTML = ''; return null; }
+      const hMeas = parseFloat(document.getElementById('shadeH').value);
+      const tt = document.getElementById('shadeT').value.split(',').map(parseFloat);
+      const lat = parseFloat(document.getElementById('shadeLat').value) || 35.68;
+      const diff = Math.max(0, parseFloat(document.getElementById('shadeDiff').value) || 0);
+      const planeH = hMeas + (diff >= 1 ? (diff - 1) / 2 : 0);
+      const fl = floors.map(function (f) {
+        return { lo: f.floor === 1 ? 0 : fl1 + (f.floor - 1) * floorH, hi: fl1 + f.floor * floorH, polys: f.polys };
+      });
+      const hk = shadeIsHokkaido(), t0 = hk ? 9 : 8, t1 = hk ? 15 : 16;
+      const res = computeShade({ t0: t0, t1: t1, S: S, floors: fl, nvec: nvec, lat: lat, planeH: planeH, limits: { near: tt[0], far: tt[1] } });
+      const top = fl1 + floors.length * floorH;
+      const zkey = document.getElementById('zoning').value, kind = SHADE_PRESET[zkey] ? SHADE_PRESET[zkey].kind : null;
+      let target = '';
+      if (kind === 'low') target = (top > 7 || floors.length >= 3) ? '対象建築物の規模（軒高7m超または地上3階建て以上）に当たる見込みです。' : '軒高7m以下かつ2階建て以下の見込みで、規模要件では対象外になる可能性があります。';
+      else if (kind === 'high') target = top > 10 ? '対象建築物の規模（高さ10m超）に当たる見込みです。' : '高さ10m以下の見込みで、規模要件では対象外になる可能性があります。';
+      const ok = res.maxNear <= tt[0] + 1e-6 && res.maxFar <= tt[1] + 1e-6;
+      const f1 = function (n) { return (Math.round(n * 10) / 10).toFixed(1); };
+      let h = '<div class="plan shadecard"><div class="pt">日影規制の検討（冬至日 真太陽時' + t0 + '〜' + t1 + '時）</div>';
+      h += '<div class="shade-sum ' + (ok ? 'ok' : 'ng') + '">' + (ok ? '適合（今のボリュームで規制時間内）' : '超過あり（今のボリュームでは規制時間を超えます）') + '</div>';
+      h += shadeSvg(res, S, floors, nvec);
+      h += '<div class="shade-legend"><span><i style="background:#fcd34d"></i>日影（色が濃いほど長い）</span><span><i style="background:#dc2626"></i>規制時間超過</span><span><i style="border:1px dashed #64748b;background:#fff"></i>5m・10mライン</span><span><i style="border:2px solid #b91c1c;background:#fff"></i>規制時間の等時間線</span></div>';
+      h += '<table class="ftable shadetbl"><tbody>';
+      h += '<tr><td>5m超10m以内</td><td class="num">最大 ' + f1(res.maxNear) + ' h</td><td>規制 ' + tt[0] + ' h</td></tr>';
+      h += '<tr><td>10m超</td><td class="num">最大 ' + f1(res.maxFar) + ' h</td><td>規制 ' + tt[1] + ' h</td></tr>';
+      h += '</tbody></table>';
+      if (!ok) h += '<div class="warn">規制を超える範囲：約 ' + Math.round(res.exceedArea) + '㎡（図の赤い部分。丸印が最も超えている付近です）。</div>';
+      h += '<div class="shade-note">条件：測定面 GL＋' + f1(planeH) + 'm' + (diff >= 1 ? '（隣地との高低差 ' + f1(diff) + 'm の補正後）' : '') + '／北緯 ' + lat + '°／規制 ' + tt[0] + 'h−' + tt[1] + 'h。道路などに接する辺は、幅の1/2（幅10m超は反対側から5m）だけ外側を敷地境界線とみなしています。' + (target ? '<br>' + target : '') + '<br>建築可能なボリュームを最大に建てた場合の確認です。実際の申請では、対象区域・規制時間・測定面の高さを自治体の条例で確認し、日影図で検証してください。</div>';
+      h += '</div>';
+      box.innerHTML = h;
+      return { ok: ok, maxNear: res.maxNear, maxFar: res.maxFar };
+    }
+
     /* ================= 計算 ================= */
     function readEdges() {
       const gv = function (id) { return parseFloat(document.getElementById(id).value); };
@@ -1835,6 +2155,10 @@
           plans += '<div class="plan"><div class="pt">' + f.floor + 'F (' + f.area.toFixed(1) + '㎡)</div>' + planSvg(f.polys, ctx, f.rect) + '</div>';
         });
         document.getElementById('floorPlans').innerHTML = plans;
+        try {
+          const sh = runShade(S, floors, nvec, fl1, floorH);
+          if (sh) document.getElementById('summary').insertAdjacentHTML('beforeend', tile('日影規制', sh.ok ? '適合' : '超過', '5〜10m ' + (Math.round(sh.maxNear * 10) / 10) + 'h／10m超 ' + (Math.round(sh.maxFar * 10) / 10) + 'h'));
+        } catch (err) { console.error(err); document.getElementById('shadeResult').innerHTML = '<div class="warn">日影の計算でエラー: ' + err.message + '</div>'; }
 
         const gapsText = edges.map(function (e, i) { return e.type === 'neighbor' ? edgeName(i).replace(/（.*?）/, '') + ' ' + gaps[i].toFixed(1) + 'm' : null; }).filter(function (x) { return x; }).join('・');
         const otherRoads = roadEdges.filter(function (x) { return x.i > 0; });
@@ -1877,6 +2201,8 @@
 
     /* ================= 起動 ================= */
     initCompass();
+    document.getElementById('zoning').addEventListener('change', shadePreset);
+    shadeCityInit();
     initEdgeCards();
     initEditor();
     initTable();
