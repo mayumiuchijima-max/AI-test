@@ -2002,6 +2002,171 @@
       return { floors: best.floors, cuts: list };
     }
 
+
+    // 日影を満たしつつ、できるだけ大きく残すように、1m角のブロック単位で自動的に削る
+    function shadeFitVoxel(S, floors, nvec, fl1, floorH) {
+      const P = shadeParams(), c = 1.0, L = floors.length;
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      floors.forEach(function (f) { f.polys.forEach(function (p) { const bb = polyBBox(p); x0 = Math.min(x0, bb.x0); x1 = Math.max(x1, bb.x1); z0 = Math.min(z0, bb.z0); z1 = Math.max(z1, bb.z1); }); });
+      const nx = Math.max(1, Math.ceil((x1 - x0) / c - 1e-9)), nz = Math.max(1, Math.ceil((z1 - z0) / c - 1e-9)), NN = nx * nz;
+      const ccw = function (p) { return polyArea(p) < 0 ? p.slice().reverse() : p; };
+      const cellRect = function (i, j) { return [{ x: x0 + i * c, z: z0 + j * c }, { x: x0 + (i + 1) * c, z: z0 + j * c }, { x: x0 + (i + 1) * c, z: z0 + (j + 1) * c }, { x: x0 + i * c, z: z0 + (j + 1) * c }]; };
+      const keep = floors.map(function (f) {
+        const a = new Uint8Array(NN), polys = f.polys.map(ccw);
+        for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+          const r = cellRect(i, j);
+          for (let q = 0; q < polys.length; q++) { if (absArea(clipByConvex(r, polys[q])) > 1e-4) { a[j * nx + i] = 1; break; } }
+        }
+        return a;
+      });
+      const count = function (k) { let n = 0; for (let t = 0; t < NN; t++) n += keep[k][t]; return n; };
+      const initCount = floors.map(function (_, k) { return count(k); });
+      const lo = function (k) { return floors[k].floor === 1 ? 0 : fl1 + (floors[k].floor - 1) * floorH; };
+      const hi = function (k) { return fl1 + floors[k].floor * floorH; };
+      // ブロックを行ごとにまとめて長方形にする
+      const rectsOf = function (k) {
+        const rows = [];
+        for (let j = 0; j < nz; j++) {
+          let i = 0;
+          while (i < nx) {
+            if (!keep[k][j * nx + i]) { i++; continue; }
+            let e = i; while (e + 1 < nx && keep[k][j * nx + e + 1]) e++;
+            rows.push({ i0: i, i1: e + 1, j0: j, j1: j + 1 }); i = e + 1;
+          }
+        }
+        rows.sort(function (a, b) { return a.i0 - b.i0 || a.i1 - b.i1 || a.j0 - b.j0; });
+        const out = [];
+        rows.forEach(function (r) {
+          const last = out[out.length - 1];
+          if (last && last.i0 === r.i0 && last.i1 === r.i1 && last.j1 === r.j0) last.j1 = r.j1; else out.push({ i0: r.i0, i1: r.i1, j0: r.j0, j1: r.j1 });
+        });
+        return out.map(function (r) { return { x0: x0 + r.i0 * c, x1: x0 + r.i1 * c, z0: z0 + r.j0 * c, z1: z0 + r.j1 * c }; });
+      };
+      const fullPrisms = function () {
+        const out = [];
+        for (let k = 0; k < L; k++) { const rs = rectsOf(k); if (rs.length) out.push({ lo: lo(k), hi: hi(k), polys: rs.map(rectToPoly) }); }
+        return out;
+      };
+      const evalRes = function (prisms, fine) {
+        return computeShade({ t0: P.t0, t1: P.t1, S: S, floors: prisms, nvec: nvec, lat: P.lat, planeH: P.planeH, limits: { near: P.tt[0], far: P.tt[1] },
+          step: fine ? 0.5 : 1.0, dt: fine ? 5 / 60 : 10 / 60, fast: true });
+      };
+      const isOk = function (r) { return r.maxNear <= P.tt[0] + 1e-6 && r.maxFar <= P.tt[1] + 1e-6; };
+      // 太陽の向き（光線）
+      const east = { x: nvec.nz, z: -nvec.nx }, north = { x: nvec.nx, z: nvec.nz };
+      const rays = function (dt) {
+        const out = [];
+        for (let t = P.t0 + dt / 2; t < P.t1; t += dt) {
+          const s = sunDirAt(P.lat, t);
+          if (s.u > 0.02) out.push({ kx: (s.e * east.x + s.n * north.x) / s.u, kz: (s.e * east.z + s.n * north.z) / s.u });
+        }
+        return out;
+      };
+      const removeColumn = function (k, t) { for (let q = k; q < L; q++) keep[q][t] = 0; };
+      const blameStep = function (res, dt) {
+        const lim = res.lim, viol = [];
+        for (let j = 0; j < res.nz; j++) for (let i = 0; i < res.nx; i++) {
+          const idx = j * res.nx + i, d = res.dist[idx];
+          if (d <= 5 || d > 32) continue;
+          if (res.hrs[idx] > (d <= 10 ? lim.near : lim.far) + 1e-6) viol.push({ x: res.x0 + i * res.step, z: res.z0 + j * res.step });
+        }
+        if (!viol.length) return 0;
+        const stepV = Math.max(1, Math.ceil(viol.length / 350)), ks = rays(dt), blame = new Int32Array(L * NN);
+        for (let v = 0; v < viol.length; v += stepV) {
+          const px = viol[v].x, pz = viol[v].z;
+          ks.forEach(function (r) {
+            for (let k = L - 1; k >= 0; k--) {
+              const h1 = hi(k);
+              if (h1 <= P.planeH) break;
+              const ya = Math.max(lo(k), P.planeH), n = Math.max(2, Math.ceil(Math.hypot((h1 - ya) * r.kx, (h1 - ya) * r.kz) / 0.25));
+              let hit = -1;
+              for (let s = n; s >= 0; s--) {
+                const y = ya + (h1 - ya) * s / n, qx = px + (y - P.planeH) * r.kx, qz = pz + (y - P.planeH) * r.kz;
+                const ci = Math.floor((qx - x0) / c), cj = Math.floor((qz - z0) / c);
+                if (ci < 0 || cj < 0 || ci >= nx || cj >= nz) continue;
+                if (keep[k][cj * nx + ci]) { hit = cj * nx + ci; break; }
+              }
+              if (hit >= 0) { blame[k * NN + hit]++; break; }
+            }
+          });
+        }
+        let mx = 0, cand = 0;
+        for (let t = 0; t < blame.length; t++) { if (blame[t] > mx) mx = blame[t]; if (blame[t] > 0) cand++; }
+        if (!mx) return 0;
+        const th = Math.max(1, Math.ceil(mx * 0.7)), list = [];
+        for (let t = 0; t < blame.length; t++) if (blame[t] >= th) list.push(t);
+        list.sort(function (a, b) { return blame[b] - blame[a]; });
+        const take = Math.max(1, Math.min(list.length, Math.ceil(cand * 0.15), 12));
+        for (let q = 0; q < take; q++) { const k = Math.floor(list[q] / NN); removeColumn(k, list[q] % NN); }
+        return take;
+      };
+      const t0 = Date.now();
+      let r = evalRes(fullPrisms(), false);
+      if (isOk(r) && isOk(evalRes(fullPrisms(), true))) return { floors: null, noChange: true };
+      let it = 0;
+      for (; it < 400 && Date.now() - t0 < 25000; it++) {
+        if (isOk(r)) break;
+        if (!blameStep(r, 10 / 60)) break;
+        r = evalRes(fullPrisms(), false);
+      }
+      for (let n = 0; n < 60 && Date.now() - t0 < 40000; n++) {          // 細かい刻みで最終確認
+        const rf = evalRes(fullPrisms(), true);
+        if (isOk(rf)) break;
+        if (!blameStep(rf, 5 / 60)) break;
+      }
+      // 見た目の整理：削った階について、細い部分（2m角が入らない所）と、離れた小さな塊をなくす（削るだけなので日影は増えない）
+      for (let k = 0; k < L; k++) {
+        if (count(k) === 0) break;
+        if (count(k) !== initCount[k]) {
+          const a = keep[k], t = new Uint8Array(NN);
+          for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+            if (a[j * nx + i] && a[j * nx + i + 1] && a[(j + 1) * nx + i] && a[(j + 1) * nx + i + 1]) { t[j * nx + i] = t[j * nx + i + 1] = t[(j + 1) * nx + i] = t[(j + 1) * nx + i + 1] = 1; }
+          }
+          // 最大の塊だけ残す
+          const lab = new Int32Array(NN); let best = 0, bestN = 0, cur = 0;
+          for (let s0 = 0; s0 < NN; s0++) {
+            if (!t[s0] || lab[s0]) continue;
+            cur++; let n = 0; const st = [s0]; lab[s0] = cur;
+            while (st.length) {
+              const v = st.pop(); n++;
+              const vi = v % nx, vj = (v - vi) / nx;
+              [[vi - 1, vj], [vi + 1, vj], [vi, vj - 1], [vi, vj + 1]].forEach(function (q) {
+                if (q[0] < 0 || q[1] < 0 || q[0] >= nx || q[1] >= nz) return;
+                const w = q[1] * nx + q[0];
+                if (t[w] && !lab[w]) { lab[w] = cur; st.push(w); }
+              });
+            }
+            if (n > bestN) { bestN = n; best = cur; }
+          }
+          for (let v = 0; v < NN; v++) a[v] = (lab[v] === best && best > 0) ? 1 : 0;
+        }
+        for (let q = k + 1; q < L; q++) for (let v = 0; v < NN; v++) keep[q][v] = keep[q][v] & keep[k][v];
+      }
+      // 結果の形：削っていない階は元の形のまま、削った階は元の形とブロックの重なり
+      const out = [];
+      for (let k = 0; k < L; k++) {
+        let polys;
+        if (count(k) === 0) break;
+        if (count(k) === initCount[k]) polys = floors[k].polys;
+        else {
+          polys = [];
+          const orig = floors[k].polys.map(ccw);
+          rectsOf(k).forEach(function (rc) {
+            orig.forEach(function (op) { const q = cleanPoly(clipByConvex(rectToPoly(rc), op)); if (q.length >= 3 && absArea(q) > 0.05) polys.push(q); });
+          });
+        }
+        const a = totalArea(polys);
+        if (a < 5) break;
+        const sh = floorShape(polys);
+        out.push({ floor: floors[k].floor, polys: sh.polys, text: sh.text, area: a, rect: sh.rect });
+      }
+      if (!out.length) return null;
+      const chk = computeShade({ t0: P.t0, t1: P.t1, S: S, floors: shadePrisms(out, fl1, floorH), nvec: nvec, lat: P.lat, planeH: P.planeH, limits: { near: P.tt[0], far: P.tt[1] }, fast: true });
+      if (!isOk(chk)) return null;
+      const areas = floors.map(function (f, k) { return { floor: f.floor, before: f.area, after: k < out.length ? out[k].area : 0 }; }).filter(function (a) { return Math.abs(a.after - a.before) > 0.05; });
+      return { floors: out, cuts: [], areas: areas };
+    }
+
     function runShade(S, floors, nvec, fl1, floorH, fitInfo) {
       const box = document.getElementById('shadeResult');
       if (!document.getElementById('shadeOn').checked) { box.innerHTML = ''; return null; }
@@ -2026,13 +2191,13 @@
       h += '</tbody></table>';
       if (!ok) h += '<div class="warn">規制を超える範囲：約 ' + Math.round(res.exceedArea) + '㎡（図の赤い部分。丸印が最も超えている付近です）。</div>';
       if (!ok && !fitInfo) {
-        h += '<div class="shade-fit"><button type="button" class="shadebtn" onclick="shadeFitRun()">日影を満たす形にする（階ごとに北側を後退）</button>' + (shadeFitMsg ? '<div class="warn">' + shadeFitMsg + '</div>' : '') + '</div>';
+        h += '<div class="shade-fit"><button type="button" class="shadebtn" onclick="shadeFitRun(\'cut\')">日影を満たす形にする（階ごとに北側を後退）</button><button type="button" class="shadebtn" style="margin-top:6px" onclick="shadeFitRun(\'voxel\')">日影を満たしつつ、できるだけ大きく残す（自動で細かく削る）</button><div class="shade-note" style="margin:4px 0 0">後者は1m角のブロックで、北側だけでなく東西の角なども削ります。数秒〜数十秒かかることがあります。</div>' + (shadeFitMsg ? '<div class="warn">' + shadeFitMsg + '</div>' : '') + '</div>';
       }
       if (fitInfo) {
-        let li = fitInfo.cuts.length ? fitInfo.cuts.map(function (c) { return c.removed ? c.floor + 'F：なし' : c.floor + 'F：北側を ' + f1(c.cut) + 'm 後退'; }).join('、') : '（調整なし）';
+        let li = fitInfo.areas ? (fitInfo.areas.length ? fitInfo.areas.map(function (a) { return a.floor + 'F：' + f1(a.before) + '→' + f1(a.after) + '㎡'; }).join('、') : '（調整なし）') : fitInfo.cuts.length ? fitInfo.cuts.map(function (c) { return c.removed ? c.floor + 'F：なし' : c.floor + 'F：北側を ' + f1(c.cut) + 'm 後退'; }).join('、') : '（調整なし）';
         h += '<div class="shade-fit"><div class="shade-note" style="margin:0 0 6px">調整内容：' + li + '<br>延床面積 ' + f1(fitInfo.before) + '㎡ → ' + f1(fitInfo.after) + '㎡（' + f1(fitInfo.after - fitInfo.before) + '㎡）</div><button type="button" class="shadebtn sub" onclick="shadeFitReset()">最大ボリュームに戻す</button></div>';
       }
-      h += '<div class="shade-note">条件：測定面 GL＋' + f1(planeH) + 'm' + (diff >= 1 ? '（隣地との高低差 ' + f1(diff) + 'm の補正後）' : '') + '／北緯 ' + lat + '°／規制 ' + tt[0] + 'h−' + tt[1] + 'h。道路などに接する辺は、幅の1/2（幅10m超は反対側から5m）だけ外側を敷地境界線とみなしています。' + (target ? '<br>' + target : '') + (fitInfo ? '<br>北側を階ごとに後退させて、日影が規制時間内になるようにした形です。' : '<br>建築可能なボリュームを最大に建てた場合の確認です。')+'実際の申請では、対象区域・規制時間・測定面の高さを自治体の条例で確認し、日影図で検証してください。</div>';
+      h += '<div class="shade-note">条件：測定面 GL＋' + f1(planeH) + 'm' + (diff >= 1 ? '（隣地との高低差 ' + f1(diff) + 'm の補正後）' : '') + '／北緯 ' + lat + '°／規制 ' + tt[0] + 'h−' + tt[1] + 'h。道路などに接する辺は、幅の1/2（幅10m超は反対側から5m）だけ外側を敷地境界線とみなしています。' + (target ? '<br>' + target : '') + (fitInfo ? (fitInfo.areas ? '<br>1m角のブロックを単位に、日影が規制時間内になるよう自動で削った形です（図面の線は、元の敷地・斜線の形に合わせて整えています）。' : '<br>北側を階ごとに後退させて、日影が規制時間内になるようにした形です。') : '<br>建築可能なボリュームを最大に建てた場合の確認です。')+'実際の申請では、対象区域・規制時間・測定面の高さを自治体の条例で確認し、日影図で検証してください。</div>';
       h += '</div>';
       box.innerHTML = h;
       return { ok: ok, maxNear: res.maxNear, maxFar: res.maxFar };
@@ -2233,13 +2398,13 @@
         shadeFitMsg = '';
         if (fitReq && document.getElementById('shadeOn').checked && floors.length) {
           const before = floors.reduce(function (s, f) { return s + f.area; }, 0);
-          const fr = shadeFitFloors(S, floors, nvec, fl1, floorH);
-          if (!fr) shadeFitMsg = 'この敷地・条件では、階ごとの後退では規制を満たす形を作れませんでした（低い階だけでも規制を超えます）。測定面・規制時間・敷地の形を見直してください。';
+          const fr = fitReq === 'voxel' ? shadeFitVoxel(S, floors, nvec, fl1, floorH) : shadeFitFloors(S, floors, nvec, fl1, floorH);
+          if (!fr) shadeFitMsg = 'この敷地・条件では、規制を満たす形を作れませんでした（低い階だけでも規制を超えます）。測定面・規制時間・敷地の形を見直してください。';
           else if (fr.noChange) shadeFitMsg = '調整は不要でした。';
           else {
             floors.splice(0, floors.length);
             fr.floors.forEach(function (f) { floors.push(f); });
-            fitInfo = { cuts: fr.cuts, before: before, after: fr.floors.reduce(function (s, f) { return s + f.area; }, 0) };
+            fitInfo = { cuts: fr.cuts, areas: fr.areas, before: before, after: fr.floors.reduce(function (s, f) { return s + f.area; }, 0) };
           }
         }
 
@@ -2321,7 +2486,10 @@
     }
 
     let shadeFitPending = false, shadeFitMsg = '';
-    function shadeFitRun() { shadeFitPending = true; calculate(); }
+    function shadeFitRun(mode) {
+      document.querySelectorAll('.shadebtn').forEach(function (b) { b.disabled = true; b.textContent = '計算中…'; });
+      setTimeout(function () { shadeFitPending = mode || 'cut'; calculate(); }, 40);
+    }
     function shadeFitReset() { shadeFitPending = false; calculate(); }
 
     /* ================= 起動 ================= */
