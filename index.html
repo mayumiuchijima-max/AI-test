@@ -1901,7 +1901,12 @@
       // 北矢印・スケール
       const ax = X1 - 7, az = Z1 - 8, vx = nvec.nx, vy = -nvec.nz;
       s += '<g stroke="#dc2626" stroke-width="0.4" fill="#dc2626"><line x1="' + f2(ax - vx * 3.5) + '" y1="' + f2(-az - vy * 3.5) + '" x2="' + f2(ax + vx * 3.5) + '" y2="' + f2(-az + vy * 3.5) + '"/><circle cx="' + f2(ax + vx * 3.5) + '" cy="' + f2(-az + vy * 3.5) + '" r="0.9"/><text x="' + f2(ax + vx * 6 - 1.2) + '" y="' + f2(-az + vy * 6 + 1) + '" font-size="3.2" stroke="none">北</text></g>';
-      s += '<g stroke="#334155" stroke-width="0.2"><line x1="' + f2(X0 + 2) + '" y1="' + f2(-Z0 - 2) + '" x2="' + f2(X0 + 12) + '" y2="' + f2(-Z0 - 2) + '"/></g><text x="' + f2(X0 + 2) + '" y="' + f2(-Z0 - 3) + '" font-size="2.6" fill="#334155">10m</text>';
+      // スケールバー：10m、1mごとに目盛り（5mと10mは長め）
+      const sx = X0 + 2, sy = -Z0 - 2;
+      let sc = '<line x1="' + f2(sx) + '" y1="' + f2(sy) + '" x2="' + f2(sx + 10) + '" y2="' + f2(sy) + '"/>';
+      for (let m = 0; m <= 10; m++) { const th = (m === 0 || m === 5 || m === 10) ? 1.4 : 0.8; sc += '<line x1="' + f2(sx + m) + '" y1="' + f2(sy) + '" x2="' + f2(sx + m) + '" y2="' + f2(sy - th) + '"/>'; }
+      s += '<g stroke="#334155" stroke-width="0.14">' + sc + '</g>';
+      s += '<g fill="#334155" font-size="2.6"><text x="' + f2(sx - 0.6) + '" y="' + f2(sy - 2.0) + '">0</text><text x="' + f2(sx + 4.2) + '" y="' + f2(sy - 2.0) + '">5</text><text x="' + f2(sx + 8.6) + '" y="' + f2(sy - 2.0) + '">10m</text></g>';
       s += '</svg>';
       return s;
     }
