@@ -129,9 +129,10 @@
       .plan, .tile, table.ftable tr { break-inside: avoid; }
     }
     h1 .ver { display: inline-block; margin-left: 8px; padding: 2px 8px; font-size: 0.7rem; font-weight: 600; color: #1e3a8a; background: #dbeafe; border-radius: 999px; vertical-align: middle; }
+    .vstamp { color: #94a3b8; letter-spacing: 0; margin-left: 6px; }
     .byline { margin: -6px 0 10px; font-size: 0.72rem; letter-spacing: 0.08em; color: #64748b; }
     .sitefoot { margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 0.72rem; color: #94a3b8; }
-    @media print { .byline, .sitefoot { display: none !important; } }
+    @media print { #errBanner, .byline, .sitefoot { display: none !important; } }
     .shape-title { font-size: 0.8rem; font-weight: 700; color: #1e3a8a; margin: 10px 0 4px; }
     .dim-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .dim-row label { flex: 1 1 110px; font-size: 0.72rem; color: #1e3a8a; font-weight: 600; }
@@ -162,7 +163,9 @@
 </head>
 <body>
   <h1>簡易ボリューム検討ツール<span class="ver">変形地版</span></h1>
-  <div class="byline">株式会社スカイリブ環境計画</div>
+  <div class="byline">株式会社スカイリブ環境計画　<span class="vstamp">版 2026-10-06 17:05</span></div>
+  <div id="errBanner" style="display:none;background:#fee2e2;color:#991b1b;border:1px solid #fca5a5;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:0.75rem;word-break:break-all"></div>
+  <script>window.addEventListener("error",function(e){var b=document.getElementById("errBanner");if(!b)return;b.style.display="block";b.textContent="エラー: "+(e.message||"読み込み失敗")+(e.filename?" ("+String(e.filename).split("/").pop()+":"+e.lineno+")":"");});</script>
 
   <div class="form-group">
     <label>物件名 / 所在地（PDFに印字されます）</label>
@@ -1844,8 +1847,4 @@
         };
 
         document.getElementById('slopeRatio').textContent = slope;
-        document.getElementById('applyDistText').textContent = applyDist != null ? (applyDist + 'm（各道路の反対側の境界から。法定容積率 ' + farLegal + '%）') : '用途地域が未選択のため、距離の制限なし';
-        document.getElementById('heightLimit').textContent = ((road + parkFront + setback) * slope).toFixed(2);
-        document.getElementById('absHeight').textContent = absHeight !== null ? absHeight + ' m' : 'なし';
-        document.getElementById('heightRuleText').textContent = heightLabel;
-        document.getElementById('adjRuleText').textContent = z.adjStart != null ? (z.adjStart + 'm＋' + z.adjSlope + '／後退緩和：' + (gapsText || 'なし') + '
+        docum
