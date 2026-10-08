@@ -140,7 +140,7 @@ footer.foot b{color:var(--ink);font-weight:700;letter-spacing:.08em}
 .rpt-title{font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:.04em}
 .rpt-meta{font-size:11px;color:#5a6660}
 .rpt-foot{position:absolute;left:36px;right:36px;bottom:14px;display:flex;justify-content:space-between;font-size:9.5px;color:#5a6660;border-top:1px solid #d3dad5;padding-top:5px}
-.rpt-foot span:first-child{color:#1b2420;font-weight:700;letter-spacing:.08em}
+.rpt-foot span:first-child{letter-spacing:.04em}
 .rpt-cover{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}
 .rpt-big{font-family:var(--f-display);font-weight:800;font-size:26px}
 .rpt-sub{font-size:11.5px;color:#5a6660;margin-top:2px}
@@ -1391,7 +1391,7 @@ const COMPANY='株式会社スカイリブ環境計画';
 const PW=1123, PH=794; // A4横 96dpi
 function rptFmt(v){if(v===''||v==null)return '';if(typeof v==='number')return v?fmt(v):'';return esc(v)}
 function rptPage(title,inner,pageLabel){
-  return `<div class="rpt-page"><div class="rpt-head"><div class="rpt-title">${esc(title)}</div><div class="rpt-meta">${esc(S.bldg.name||'')}　${esc(USES[S.use].label)}</div></div><div class="rpt-body">${inner}</div><div class="rpt-foot"><span>${COMPANY}</span><span>長期修繕計画 作成ツールによる試算（概算）</span><span class="pno">${pageLabel||''}</span></div></div>`;
+  return `<div class="rpt-page"><div class="rpt-head"><div class="rpt-title">${esc(title)}</div><div class="rpt-meta">${esc(S.bldg.name||'')}　${esc(USES[S.use].label)}</div></div><div class="rpt-body">${inner}</div><div class="rpt-foot"><span>Powered by 長期修繕計画 作成ツール ／ ${COMPANY}</span><span class="pno">${pageLabel||''}</span></div></div>`;
 }
 function rptTablePages(title,headLeft,rows,yearsFrom,yearCols,totalCol,rowsPer){
   // rows: {left:[], years:[], total, cls}
@@ -1431,7 +1431,7 @@ async function makePDF(){
     f?['現行の年間積立額',fmt(currentV())+' 千円/年']:['現行の修繕積立金',fmt(currentV())+' 円/㎡・月'],
     ['積立の案',({current:'現行のまま',equal:'均等積立',step:'段階増額'})[S.fund.mode]],['最終年度末の残高（案）',fmt(lastBal)+' 千円'],['期間中の最少残高（案）',fmt(minBal)+' 千円']];
   const kv=a=>'<table class="rpt-kv">'+a.map(([k2,v])=>`<tr><th>${esc(k2)}</th><td>${esc(v)}</td></tr>`).join('')+'</table>';
-  pages.push({title:'長期修繕計画書（試算）',html:`<div class="rpt-cover"><div><div class="rpt-big">${esc(S.bldg.name||'')}</div><div class="rpt-sub">長期修繕計画書（試算）　作成日 ${ds}</div><div class="rpt-sub">${esc(USES[S.use].subtitle)}</div></div><div class="rpt-co">${COMPANY}</div></div>
+  pages.push({title:'長期修繕計画書（試算）',html:`<div class="rpt-cover"><div><div class="rpt-big">${esc(S.bldg.name||'')}</div><div class="rpt-sub">長期修繕計画書（試算）　作成日 ${ds}</div><div class="rpt-sub">${esc(USES[S.use].subtitle)}</div></div></div>
     <div class="rpt-2col"><div><h4>建物の概要</h4>${kv(bl)}</div><div><h4>試算結果の要点</h4>${kv(kp)}</div></div>
     <div class="rpt-2col"><div><h4>年度別 推定修繕工事費（税込・千円）</h4><canvas id="rptC1" width="500" height="210"></canvas></div><div><h4>積立残高の推移（千円）　<span class="lg"><i style="background:#eb6834"></i>現行のまま　<i style="background:#2a78d6"></i>積立の案</span></h4><canvas id="rptC2" width="500" height="210"></canvas></div></div>`});
   // 2. 総括表
@@ -1447,7 +1447,7 @@ async function makePDF(){
   const planDesc=S.fund.mode==='current'?`現行の積立額（${fmt(currentV())} ${UNIT()}）のまま`:S.fund.mode==='equal'?`均等積立（${fmt(plan[0].rate)} ${UNIT()}）`:'段階増額：'+steps.map(s=>`${s.year}年度〜 ${fmt(num(s.rate))} ${UNIT()}`).join('　／　');
   pages.push({title:f?'修繕費の財源と積立額':'修繕積立金の額の設定（様式第5号）',html:`<div class="rpt-2col"><div><h4>${f?'必要な積立額の計算':'様式第5号の計算'}</h4><table class="rpt-tbl rpt-f5">${$('#f5').innerHTML}</table></div><div><h4>積立の案</h4><p class="rpt-p">${esc(planDesc)}</p><p class="rpt-p">最終年度末の残高 ${fmt(lastBal)} 千円 ／ 期間中の最少残高 ${fmt(minBal)} 千円（${C.years[plan.findIndex(r=>r.bal===minBal)]}年度）</p><h4>${esc($('#perTitle').textContent)}</h4><table class="rpt-tbl">${$('#perUnit').innerHTML}</table></div></div>`});
   // 5. チェック
-  pages.push({title:'チェック結果',html:'<table class="rpt-tbl rpt-chk"><thead><tr><th>判定</th><th>項目</th><th>内容</th></tr></thead><tbody>'+checks.map(x=>`<tr><td class="st ${x.st}">${x.st==='good'?'✓ 適合':x.st==='warn'?'！ 要確認':'✕ 不適合'}</td><td>${esc(x.t)}</td><td>${esc(x.d)}</td></tr>`).join('')+'</tbody></table><p class="rpt-note">本書は入力された条件に基づく概算の試算です。工事の内容・時期・費用を確定するものではありません。5年程度ごとに調査・診断を行い、見直してください。</p>'});
+  pages.push({title:'チェック結果',html:'<table class="rpt-tbl rpt-chk"><thead><tr><th>判定</th><th>項目</th><th>内容</th></tr></thead><tbody>'+checks.map(x=>`<tr><td class="st ${x.st}">${x.st==='good'?'✓ 適合':x.st==='warn'?'！ 要確認':'✕ 不適合'}</td><td>${esc(x.t)}</td><td>${esc(x.d)}</td></tr>`).join('')+'</tbody></table>'});
   // 描画
   const host=document.createElement('div');host.className='rpt-host';
   host.innerHTML=pages.map((p,i)=>rptPage(p.title,p.html,`${i+1} / ${pages.length}`)).join('');
