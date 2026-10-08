@@ -130,17 +130,57 @@ details.guide div{font-size:12.5px;color:var(--muted);max-width:80ch;padding-top
 .usebar .lab{font-size:12px;color:var(--muted);letter-spacing:.06em}
 .usebar .seg button{padding:6px 14px}
 .usenote{font-size:12px;color:var(--muted)}
+.company{font-size:11px;color:var(--muted);letter-spacing:.12em;margin-top:6px}
+footer.foot{margin-top:40px;padding-block:16px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:space-between;font-size:12px;color:var(--muted)}
+footer.foot b{color:var(--ink);font-weight:700;letter-spacing:.08em}
+/* PDF用の紙面（画面外で描画し画像化する。紙なので固定色） */
+.rpt-host{position:fixed;left:-20000px;top:0;width:1123px;color-scheme:light}
+.rpt-page{position:relative;width:1123px;height:794px;background:#fff;color:#1b2420;font-family:var(--f-body);padding:30px 36px 0;box-sizing:border-box;overflow:hidden}
+.rpt-head{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #1b2420;padding-bottom:6px;margin-bottom:12px}
+.rpt-title{font-family:var(--f-display);font-weight:800;font-size:18px;letter-spacing:.04em}
+.rpt-meta{font-size:11px;color:#5a6660}
+.rpt-foot{position:absolute;left:36px;right:36px;bottom:14px;display:flex;justify-content:space-between;font-size:9.5px;color:#5a6660;border-top:1px solid #d3dad5;padding-top:5px}
+.rpt-foot span:first-child{color:#1b2420;font-weight:700;letter-spacing:.08em}
+.rpt-cover{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}
+.rpt-big{font-family:var(--f-display);font-weight:800;font-size:26px}
+.rpt-sub{font-size:11.5px;color:#5a6660;margin-top:2px}
+.rpt-co{font-size:13px;font-weight:700;letter-spacing:.1em;border:1px solid #1b2420;padding:6px 12px}
+.rpt-2col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:12px}
+.rpt-page h4{font-size:12px;margin:0 0 5px;color:#2c6e63}
+.rpt-page h4 .lg{font-weight:400;color:#5a6660;font-size:10px}
+.rpt-page h4 .lg i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:3px}
+.rpt-kv{border-collapse:collapse;width:100%;font-size:11px}
+.rpt-kv th,.rpt-kv td{border-bottom:1px solid #e3e7e4;padding:3px 6px;text-align:left;background:#fff;position:static}
+.rpt-kv th{color:#5a6660;font-weight:400;width:44%}
+.rpt-tbl{border-collapse:collapse;width:100%;font-size:9.5px;min-width:0}
+.rpt-tbl th,.rpt-tbl td{border-bottom:1px solid #e3e7e4;padding:2px 5px;background:#fff;color:#1b2420;position:static;white-space:nowrap;line-height:1.35}
+.rpt-tbl thead th{background:#eef1ee;color:#4a5550;font-weight:700;border-bottom:1px solid #c9d1cb;font-size:9.5px}
+.rpt-tbl td,.rpt-tbl th{font-size:9.5px}
+.rpt-tbl .tag{font-size:9px}
+.rpt-tbl thead th span{font-weight:400;font-size:8.5px}
+.rpt-tbl .n{text-align:right;font-family:var(--f-num)}
+.rpt-tbl tr.b td{font-weight:700;background:#f4f6f4}
+.rpt-tbl td.hit{background:#dcebe7}
+.rpt-tbl td.neg{color:#b83426;font-weight:700}
+.rpt-tbl .tag{color:#5a6660}
+.rpt-f5 td:nth-child(3){text-align:right;font-family:var(--f-num)}
+.rpt-chk td{white-space:normal;vertical-align:top;font-size:10px}
+.rpt-chk td.st{white-space:nowrap;font-weight:700}
+.rpt-chk td.st.good{color:#2f7d32}.rpt-chk td.st.warn{color:#9a5b00}.rpt-chk td.st.crit{color:#b83426}
+.rpt-note{font-size:9.5px;color:#5a6660;margin:6px 0 0}
+.rpt-p{font-size:11px;margin:0 0 6px}
 </style>
 
 <div class="wrap">
   <header class="top">
-    <h1>長期修繕計画 作成ツール<small id="subtitle"></small></h1>
+    <h1>長期修繕計画 作成ツール<small id="subtitle"></small><small class="company">株式会社スカイリブ環境計画</small></h1>
     <div class="toolbar">
       <span class="sample-badge" id="sampleBadge" hidden>サンプルデータ表示中</span>
       <button id="btnSave" type="button">データ保存(JSON)</button>
       <label class="btn" for="fileLoad">読み込み</label>
       <input type="file" id="fileLoad" accept=".json,application/json" hidden>
       <button id="btnXlsx" type="button">Excel出力</button>
+      <button id="btnPdf" type="button">PDF出力</button>
       <button id="btnReset" type="button" class="danger">サンプルに戻す</button>
     </div>
   </header>
@@ -276,11 +316,14 @@ details.guide div{font-size:12.5px;color:var(--muted);max-width:80ch;padding-top
     <p class="lead" id="t6lead"></p>
     <ul class="checks" id="checks"></ul>
   </section>
+  <footer class="foot wrap-foot"><span><b>株式会社スカイリブ環境計画</b>　長期修繕計画 作成ツール</span><span>試算結果は概算です。工事の内容・時期・費用を確定するものではありません。　© <span id="yr"></span> 株式会社スカイリブ環境計画</span></footer>
 </div>
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 "use strict";
 /* ============ マスタ：マンション（様式第3-2号） ============ */
@@ -1252,12 +1295,14 @@ function renderCharts(C,plan,cur){
 let chartTimer=null;
 
 /* ============ 全体更新 ============ */
+let LAST=null;
 function refresh(){
   const C=compute();const F=form5(C);
   const plan=simulate(C,rateFn(C,F));const cur=simulate(C,()=>currentV());
   refreshTypes();
   renderT43(C);renderT41(C,cur,plan);renderForm5(C,F,plan);renderPerUnit(C,plan);
   const checks=renderChecks(C,F,plan,cur);
+  LAST={C,F,plan,cur,checks};
   renderSummary(C,F,plan,checks);
   clearTimeout(chartTimer);chartTimer=setTimeout(()=>renderCharts(C,plan,cur),120);
 }
@@ -1309,7 +1354,7 @@ let DL=null;
 if(window.claude&&window.claude.use){window.claude.use('downloads').then(d=>{DL=d}).catch(()=>{})}
 async function download(name,blob){
   if(DL){try{await DL.save({filename:name,data:blob});toast('保存しました')}catch(e){if(e&&e.code!=='declined')toast('この画面ではファイル保存ができませんでした')}return}
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);toast('ファイルを作成しました');
 }
 const fname=ext=>(S.bldg.name||'長期修繕計画').replace(/[\\/:*?"<>|]/g,'')+'_長期修繕計画.'+ext;
 $('#btnSave').onclick=()=>download(fname('json'),new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));
@@ -1326,6 +1371,7 @@ $('#btnXlsx').onclick=()=>{
     ?[['施設の概要'],['施設名',S.bldg.name],['施設の種類',S.bldg.facType],['所在地',S.bldg.address],['構造',S.bldg.structure],['竣工年',S.bldg.completed],['階数',S.bldg.floors],['延べ面積(㎡)',S.bldg.grossArea],[capLabel(),S.bldg.capacity],[roomLabel(),S.bldg.rooms]]
     :[['（様式第1号）マンションの建物・設備の概要等'],['マンション名',S.bldg.name],['所在地',S.bldg.address],['構造',S.bldg.structure],['竣工年',S.bldg.completed],['階数',S.bldg.floors],['延べ面積(㎡)',S.bldg.grossArea],['専有面積の合計(㎡)',C.area],['住戸数',C.units],[],['住戸タイプ','専有面積(㎡)','戸数'],...S.types.map(t=>[t.name,t.area,t.count])];
   s1.push([],['計画条件'],['計画開始年度',S.plan.startYear],['計画期間(年)',S.plan.period],['諸経費率(%)',S.plan.overhead],['消費税率(%)',S.plan.tax],['物価変動率(%/年)',S.plan.inflation],['運用利率(%/年)',S.plan.interest],['積立残高(千円)',S.money.opening],f?['現行の年間積立額(千円/年)',S.money.annual]:['現行積立金(円/㎡・月)',S.money.current]);
+  s1.push([],['作成',COMPANY+'　長期修繕計画 作成ツール'],['作成日',new Date().toLocaleDateString('ja-JP')]);
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(s1),f?'1 概要':'様式1 概要');
   const s32=[['中項目','小項目','工事区分','対象部位等',f?'周期の目安':'参考周期','修繕周期(年)','次回(経年)','想定している修繕方法等','呼称','単価(円)','数量','金額(千円)','使用']];
   S.items.forEach(it=>{const m=MIDS_().find(x=>x.no===it.mid);s32.push([it.mid+' '+(m?m.name:''),it.name,it.kubun,it.target,it.ref,it.cycle,it.next,it.method,it.unit,num(it.price),qtyOf(it),Math.round(num(it.price)*qtyOf(it)/1000),it.on?'○':''])});
@@ -1339,6 +1385,96 @@ $('#btnXlsx').onclick=()=>{
   const out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
   download(fname('xlsx'),new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
 };
+
+/* ============ PDF出力（A4横の計画書） ============ */
+const COMPANY='株式会社スカイリブ環境計画';
+const PW=1123, PH=794; // A4横 96dpi
+function rptFmt(v){if(v===''||v==null)return '';if(typeof v==='number')return v?fmt(v):'';return esc(v)}
+function rptPage(title,inner,pageLabel){
+  return `<div class="rpt-page"><div class="rpt-head"><div class="rpt-title">${esc(title)}</div><div class="rpt-meta">${esc(S.bldg.name||'')}　${esc(USES[S.use].label)}</div></div><div class="rpt-body">${inner}</div><div class="rpt-foot"><span>${COMPANY}</span><span>長期修繕計画 作成ツールによる試算（概算）</span><span class="pno">${pageLabel||''}</span></div></div>`;
+}
+function rptTablePages(title,headLeft,rows,yearsFrom,yearCols,totalCol,rowsPer){
+  // rows: {left:[], years:[], total, cls}
+  const pages=[];
+  const nY=yearCols.length, chunk=10;
+  for(let c0=0;c0<nY;c0+=chunk){
+    const ys=yearCols.slice(c0,c0+chunk), isLast=c0+chunk>=nY;
+    for(let r0=0;r0<rows.length;r0+=rowsPer){
+      const rs=rows.slice(r0,r0+rowsPer);
+      let h='<table class="rpt-tbl"><thead><tr>'+headLeft.map(x=>`<th>${x}</th>`).join('')+ys.map(y=>`<th class="n">${y.y}<br><span>経年${y.a}</span></th>`).join('')+(isLast&&totalCol?`<th class="n">${totalCol}</th>`:'')+'</tr></thead><tbody>';
+      rs.forEach(r=>{h+=`<tr class="${r.cls||''}">`+r.left.map((x,i)=>`<td class="${i>0&&typeof x==='number'?'n':''}">${rptFmt(x)}</td>`).join('')+r.years.slice(c0,c0+chunk).map(v=>`<td class="n${v&&r.hit?' hit':''}${typeof v==='number'&&v<0?' neg':''}">${rptFmt(v)}</td>`).join('')+(isLast&&totalCol?`<td class="n">${rptFmt(r.total)}</td>`:'')+'</tr>'});
+      h+='</tbody></table>';
+      const sub=`${ys[0].y}〜${ys[ys.length-1].y}年度`+(rows.length>rowsPer?`（${Math.floor(r0/rowsPer)+1}/${Math.ceil(rows.length/rowsPer)}）`:'');
+      pages.push({title:title+'　'+sub,html:h+'<p class="rpt-note">単位：千円</p>'});
+    }
+  }
+  return pages;
+}
+let pdfBusy=false;
+async function makePDF(){
+  if(pdfBusy) return;
+  if(typeof html2canvas==='undefined'||!window.jspdf){toast('PDF出力の部品を読み込めませんでした');return}
+  pdfBusy=true;toast('PDFを作成しています…');
+  refresh();
+  const {C,F,plan,cur,checks}=LAST, f=K()==='f';
+  const today=new Date();const ds=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日`;
+  const total=C.cost.reduce((a,b)=>a+b,0);
+  const yc=C.years.map((y,i)=>({y,a:C.ages[i]}));
+  const pages=[];
+  // 1. 表紙・概要
+  const bl=f?[['施設名',S.bldg.name],['施設の種類',S.bldg.facType],['所在地',S.bldg.address],['構造',S.bldg.structure],['竣工年',S.bldg.completed+'年（計画開始時 経年'+C.ages[0]+'）'],['階数',S.bldg.floors+'階'],['延べ面積',fmt(num(S.bldg.grossArea))+'㎡'],[capLabel(),fmt(num(S.bldg.capacity))+(S.use==='hospital'?'床':'人')]]
+            :[['マンション名',S.bldg.name],['所在地',S.bldg.address],['構造',S.bldg.structure],['竣工年',S.bldg.completed+'年（計画開始時 経年'+C.ages[0]+'）'],['階数',S.bldg.floors+'階'],['延べ面積',fmt(num(S.bldg.grossArea))+'㎡'],['専有面積の合計',fmt(C.area,2)+'㎡'],['住戸数',fmt(C.units)+'戸']];
+  const lastBal=plan[plan.length-1].bal, minBal=Math.min(...plan.map(r=>r.bal));
+  const kp=[['計画期間',`${C.years[0]}〜${C.years[C.period-1]}年度（${C.period}年）`],['推定修繕工事費 累計（税込）',fmt(total)+' 千円'],['年平均',fmt(total/C.period)+' 千円/年'],
+    f?['均等に積み立てる場合の年額',fmt(F.eq)+' 千円/年']:['均等積立の額（様式第5号）',fmt(F.eq,1)+' 円/㎡・月'],
+    f?['途中で不足しない最低の年額',fmt(F.minEq)+' 千円/年']:['途中で不足しない最低の均等額',fmt(F.minEq,1)+' 円/㎡・月'],
+    f?['現行の年間積立額',fmt(currentV())+' 千円/年']:['現行の修繕積立金',fmt(currentV())+' 円/㎡・月'],
+    ['積立の案',({current:'現行のまま',equal:'均等積立',step:'段階増額'})[S.fund.mode]],['最終年度末の残高（案）',fmt(lastBal)+' 千円'],['期間中の最少残高（案）',fmt(minBal)+' 千円']];
+  const kv=a=>'<table class="rpt-kv">'+a.map(([k2,v])=>`<tr><th>${esc(k2)}</th><td>${esc(v)}</td></tr>`).join('')+'</table>';
+  pages.push({title:'長期修繕計画書（試算）',html:`<div class="rpt-cover"><div><div class="rpt-big">${esc(S.bldg.name||'')}</div><div class="rpt-sub">長期修繕計画書（試算）　作成日 ${ds}</div><div class="rpt-sub">${esc(USES[S.use].subtitle)}</div></div><div class="rpt-co">${COMPANY}</div></div>
+    <div class="rpt-2col"><div><h4>建物の概要</h4>${kv(bl)}</div><div><h4>試算結果の要点</h4>${kv(kp)}</div></div>
+    <div class="rpt-2col"><div><h4>年度別 推定修繕工事費（税込・千円）</h4><canvas id="rptC1" width="500" height="210"></canvas></div><div><h4>積立残高の推移（千円）　<span class="lg"><i style="background:#eb6834"></i>現行のまま　<i style="background:#2a78d6"></i>積立の案</span></h4><canvas id="rptC2" width="500" height="210"></canvas></div></div>`});
+  // 2. 総括表
+  const t41=TSV.t41;
+  const rows41=t41.slice(2).map(r=>({left:[r[0]],years:r.slice(1,1+C.period),total:r[1+C.period],cls:/小計|年度合計|累計|繰越|収入 年度合計/.test(r[0])?'b':''}));
+  rptTablePages(f?'総括表・収支計画':'長期修繕計画総括表（様式第4-1号）',['区分／項目'],rows41,0,yc,'合計',33).forEach(p=>pages.push(p));
+  // 3. 計画表
+  const t43=TSV.t43;
+  const rows43=t43.slice(2).map(r=>{const isMid=r[1]===''&&r[2]==='';return {left:[r[0],r[1],r[2]===''?'':r[2],r[6]===''?'':r[6]],years:r.slice(7,7+C.period),total:r[7+C.period],cls:isMid?'b':'',hit:!isMid}});
+  rptTablePages(f?'長期修繕計画表（小項目別・年度別）':'長期修繕計画表（様式第4-3号）',['推定修繕工事項目','工事区分','周期','金額'],rows43,0,yc,'計',33).forEach(p=>pages.push(p));
+  // 4. 財源・積立
+  const steps=(S.fund.steps||[]).slice().sort((a,b)=>a.year-b.year);
+  const planDesc=S.fund.mode==='current'?`現行の積立額（${fmt(currentV())} ${UNIT()}）のまま`:S.fund.mode==='equal'?`均等積立（${fmt(plan[0].rate)} ${UNIT()}）`:'段階増額：'+steps.map(s=>`${s.year}年度〜 ${fmt(num(s.rate))} ${UNIT()}`).join('　／　');
+  pages.push({title:f?'修繕費の財源と積立額':'修繕積立金の額の設定（様式第5号）',html:`<div class="rpt-2col"><div><h4>${f?'必要な積立額の計算':'様式第5号の計算'}</h4><table class="rpt-tbl rpt-f5">${$('#f5').innerHTML}</table></div><div><h4>積立の案</h4><p class="rpt-p">${esc(planDesc)}</p><p class="rpt-p">最終年度末の残高 ${fmt(lastBal)} 千円 ／ 期間中の最少残高 ${fmt(minBal)} 千円（${C.years[plan.findIndex(r=>r.bal===minBal)]}年度）</p><h4>${esc($('#perTitle').textContent)}</h4><table class="rpt-tbl">${$('#perUnit').innerHTML}</table></div></div>`});
+  // 5. チェック
+  pages.push({title:'チェック結果',html:'<table class="rpt-tbl rpt-chk"><thead><tr><th>判定</th><th>項目</th><th>内容</th></tr></thead><tbody>'+checks.map(x=>`<tr><td class="st ${x.st}">${x.st==='good'?'✓ 適合':x.st==='warn'?'！ 要確認':'✕ 不適合'}</td><td>${esc(x.t)}</td><td>${esc(x.d)}</td></tr>`).join('')+'</tbody></table><p class="rpt-note">本書は入力された条件に基づく概算の試算です。工事の内容・時期・費用を確定するものではありません。5年程度ごとに調査・診断を行い、見直してください。</p>'});
+  // 描画
+  const host=document.createElement('div');host.className='rpt-host';
+  host.innerHTML=pages.map((p,i)=>rptPage(p.title,p.html,`${i+1} / ${pages.length}`)).join('');
+  document.body.appendChild(host);
+  const charts=[];
+  try{
+    if(typeof Chart!=='undefined'){
+      const o={responsive:false,animation:false,devicePixelRatio:2,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},color:'#4a5550',maxRotation:0,autoSkipPadding:6}},y:{grid:{color:'#e3e7e4'},ticks:{font:{size:9},color:'#4a5550',callback:v=>fmt(v/1000)+'百万'}}}};
+      charts.push(new Chart(host.querySelector('#rptC1'),{type:'bar',data:{labels:C.years.map(String),datasets:[{data:C.cost.map(Math.round),backgroundColor:'#2a78d6',borderRadius:{topLeft:3,topRight:3},borderSkipped:'bottom'}]},options:o}));
+      charts.push(new Chart(host.querySelector('#rptC2'),{type:'line',data:{labels:C.years.map(String),datasets:[{data:cur.map(r=>Math.round(r.bal)),borderColor:'#eb6834',borderWidth:2,pointRadius:0},{data:plan.map(r=>Math.round(r.bal)),borderColor:'#2a78d6',borderWidth:2,pointRadius:0}]},options:o}));
+    }
+    if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4',compress:true});
+    const els=host.querySelectorAll('.rpt-page');
+    for(let i=0;i<els.length;i++){
+      const cv=await html2canvas(els[i],{scale:2,backgroundColor:'#ffffff',useCORS:true,logging:false});
+      if(i>0) pdf.addPage();
+      pdf.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',0,0,297,210);
+    }
+    pdf.setProperties({title:(S.bldg.name||'')+' 長期修繕計画書（試算）',author:COMPANY,creator:COMPANY+' 長期修繕計画 作成ツール'});
+    await download(fname('pdf'),pdf.output('blob'));
+  }catch(err){console.error(err);toast('PDFを作成できませんでした')}
+  finally{charts.forEach(c=>c.destroy());host.remove();pdfBusy=false}
+}
+
+$('#btnPdf').onclick=makePDF;
 let resetArmed=false;
 $('#btnReset').onclick=e=>{
   if(!resetArmed){resetArmed=true;e.target.textContent='もう一度押すと初期化';setTimeout(()=>{resetArmed=false;e.target.textContent='サンプルに戻す'},3000);return}
@@ -1356,6 +1492,7 @@ function initAll(){
 }
 initAll();
 showTab(initTab);
+$('#yr').textContent=new Date().getFullYear();
 const redraw=()=>{chCost&&chCost.destroy();chBal&&chBal.destroy();chCost=chBal=null;refresh()};
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change',redraw);
 new MutationObserver(redraw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
